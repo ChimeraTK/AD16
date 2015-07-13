@@ -33,7 +33,6 @@ namespace mtca4u{
   /*************************************************************************************************/
   void ad16::read(){
     // if not yet done, create accessor for multiplexed data
-    std::cout << "ad16::read()" << std::endl;
     if(!dataDemuxed) dataDemuxed = _mappedDevice.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DMA", "AD16");
 
     // read data
