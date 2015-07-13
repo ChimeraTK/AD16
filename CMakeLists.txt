@@ -16,6 +16,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fPIC -Wextra -ansi -Wuninitialize
 #use -DCMAKE_BUILD_TYPE=Debug in your cmake command to turn on the coverage option
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 --coverage")
 
+# linker flags
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--export-dynamic")
+
 FIND_PACKAGE(MtcaMappedDevice 00.09 REQUIRED)
 include_directories(SYSTEM ${MtcaMappedDevice_INCLUDE_DIRS})
 
@@ -30,6 +33,9 @@ IF(Boost_UNIT_TEST_FRAMEWORK_FOUND)
 ELSE(Boost_UNIT_TEST_FRAMEWORK_FOUND)
   message("Boost unit_test_framework not found, disabling testing")
 ENDIF(Boost_UNIT_TEST_FRAMEWORK_FOUND)
+
+FIND_PACKAGE(PythonLibs REQUIRED)
+include_directories( ${PYTHON_INCLUDE_DIRS} )
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 set(${PROJECT_NAME}_INCLUDE_DIRS ${${PROJECT_NAME}_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include/)
@@ -54,8 +60,7 @@ if(TESTING_IS_ENABLED)
     #NAME_WE means the base name without path and (longest) extension
     get_filename_component(excutableName ${testExecutableSrcFile} NAME_WE)
     add_executable(${excutableName} ${testExecutableSrcFile})
-    #target_link_libraries(${excutableName} ${PROJECT_NAME} ${PROJECT_NAME}_TEST_LIBRARY ${Boost_LIBRARIES})    
-    target_link_libraries(${excutableName} ${PROJECT_NAME} ${Boost_LIBRARIES})    
+    target_link_libraries(${excutableName} ${MtcaMappedDevice_LIBRARIES} ${Boost_THREAD_LIBRARIES} ${PYTHON_LIBRARIES} ${PROJECT_NAME})
     add_test(${excutableName} ${excutableName})
   endforeach( testExecutableSrcFile )
   
@@ -74,10 +79,10 @@ if(TESTING_IS_ENABLED)
 
 endif(TESTING_IS_ENABLED)
 
-
+# C++ library
 add_library(${PROJECT_NAME} SHARED ${library_sources} )
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
-target_link_libraries(${PROJECT_NAME} ${MtcaMappedDevice_LIBRARIES} ${Boost_THREAD_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${MtcaMappedDevice_LIBRARIES} ${Boost_THREAD_LIBRARIES} ${PYTHON_LIBRARIES} -lboost_python)
 
 #configure a header file which contains the version information for use in C++
 #configure_file(cmake/version.h.in "${PROJECT_BINARY_DIR}/version.h" @ONLY)

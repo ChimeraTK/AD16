@@ -9,6 +9,8 @@
 
 namespace mtca4u{
 
+  typedef std::vector<int> DataVector;
+
   /**
    *  Interface class to use the AD16 card.
    *
@@ -34,7 +36,7 @@ namespace mtca4u{
       void read();
 
       /// Get data for single channel after a previous read()
-      std::vector<int> getChannelData(unsigned int channel);
+      DataVector getChannelData(unsigned int channel);
 
     private:
 
