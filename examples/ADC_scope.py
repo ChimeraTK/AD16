@@ -35,9 +35,8 @@ class MainWindow(QtGui.QMainWindow):
         self.plot = pg.PlotWidget()
         #self.plot = self.plotW.plot()
         self.curve = self.plot.plot()
-        self.plot.setRange(QtCore.QRectF(0, -300000, 5000, 600000))
+        self.plot.setRange(QtCore.QRectF(0, -300000, 1000, 600000))
         self.setCentralWidget(self.plot)
-        self.signal_source = Data_Generator()
 
         self.statusBar = QtGui.QStatusBar()
         self.setStatusBar(self.statusBar)
@@ -45,10 +44,15 @@ class MainWindow(QtGui.QMainWindow):
         
         self.show()
         
+        # open AD16 and start first conversion
+        self.ad16 = libad16.ad16()
+        self.ad16.open("ad16dummy.map","ad16dummy.map")
+        self.ad16.startConversion()
+        
         # start the automatic update
         self.start_time = time.time()
         self.timer = QtCore.QTimer()
-        self.timer.start(1000)    # timeout in milliseconds ... 50ms => 20 frames per second
+        self.timer.start(1)    # timeout in milliseconds ... 50ms => 20 frames per second
         self.connect(self.timer, QtCore.SIGNAL('timeout()'), self.updateplot)
     
     def makeMenu(self):
@@ -78,9 +82,14 @@ class MainWindow(QtGui.QMainWindow):
         fps = 1/(time.time() - self.start_time)
         self.counter += 1
         
-        # get the data
+        # check if conversion is complete
+        if self.ad16.conversionComplete() == 0:
+            return
+
+        # get data
         self.start_time = time.time()
-        signal = self.signal_source.get_data()
+        self.ad16.read()
+        signal = self.ad16.getChannelData(1)
 
         # calculate something
         time_get_image = time.time()
@@ -103,19 +112,11 @@ class MainWindow(QtGui.QMainWindow):
             1000 * (time_get_image - self.start_time),
             1000 * (time_calc_image - time_get_image),
             1000 * (time_plot_image - time_calc_image)))
-        
 
-class Data_Generator():
-
-    def __init__(self):
-        self.ad16 = libad16.ad16()
-        self.ad16.open("ad16dummy.map","ad16dummy.map")
-        
-    def get_data(self):
+        # start the next conversion
         self.ad16.startConversion()
-        self.ad16.read()
-        signal = self.ad16.getChannelData(0)
-        return signal
+        
+
        
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)

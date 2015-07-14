@@ -3,6 +3,7 @@
 
 #include <MtcaMappedDevice/DummyDevice.h>
 #include <boost/random/mersenne_twister.hpp>
+#include <boost/thread.hpp>
 
 namespace mtca4u{
 
@@ -17,18 +18,27 @@ namespace mtca4u{
   {
     public:
 
-      ad16DummyDevice();
-      virtual ~ad16DummyDevice();
+      ad16DummyDevice() : isConversionRunning(false) {}
+      virtual ~ad16DummyDevice() {}
 
       virtual void openDev (const std::string &mappingFileName, int perm=O_RDWR, devConfigBase *pConfig=NULL);
 
     protected:
 
-      /// callback for control register writes
-      void callbackControlRegister();
+      /// callback writing to the START_CONVERSION register
+      void callbackStartConversion();
+
+      /// thread function to simulate the time needed for the conversion
+      void threadConversion();
 
       /// random number generator to fill channels with white noise
       boost::mt11213b rng;
+
+      /// thread used to simulate conversion timing
+      boost::thread theThread;
+
+      /// flag if a conversion is currently running (to prevent starting multiple conversions)
+      volatile bool isConversionRunning;
 
   };
 

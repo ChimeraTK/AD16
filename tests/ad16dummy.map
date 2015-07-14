@@ -1,23 +1,32 @@
 # name                                  nr of elements          address         size            bar     width   fracbits        signed   
 
-# write 1 to this register to start a conversion. the register will contain 0 if conversion is complete.
+# Write 1 to this register to start a conversion.
+# The register will be set to 0 when conversion is complete.
 AD16.START_CONVERSION                   0x1                     0x0             0x4             0x0     16      0               0
 
-# multiplexed DMA area for ADC raw data
+# Set sampling rate divisor.
+# 1 will be 100kHz, 2 50kHz etc.
+AD16.SAMPLING_RATE_DIV                  0x1                     0x4             0x4             0x0     16      0               0
+
+# Set number of samples per conversion block and channel.
+# To be able to read the data, AREA_MULTIPLEXED_SEQUENCE_DMA must be configured long enough.
+AD16.SAMPLES_PER_BLOCK                  0x1                     0x8             0x4             0x0     32      0               0
+
+# Multiplexed DMA area for ADC raw data
 AD16.AREA_MULTIPLEXED_SEQUENCE_DMA      0x4000                  0x0             0x10000         0xD
-AD16.SEQUENCE_DMA_0                     0x1                     0x00            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_1                     0x1                     0x04            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_2                     0x1                     0x08            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_3                     0x1                     0x0C            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_4                     0x1                     0x10            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_5                     0x1                     0x14            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_6                     0x1                     0x18            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_7                     0x1                     0x1C            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_8                     0x1                     0x20            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_9                     0x1                     0x24            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_10                    0x1                     0x28            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_11                    0x1                     0x2C            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_12                    0x1                     0x30            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_13                    0x1                     0x34            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_14                    0x1                     0x38            0x4             0xD     18      0               0
-AD16.SEQUENCE_DMA_15                    0x1                     0x3C            0x4             0xD     18      0               0
+AD16.SEQUENCE_DMA_0                     0x1                     0x00            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_1                     0x1                     0x04            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_2                     0x1                     0x08            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_3                     0x1                     0x0C            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_4                     0x1                     0x10            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_5                     0x1                     0x14            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_6                     0x1                     0x18            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_7                     0x1                     0x1C            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_8                     0x1                     0x20            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_9                     0x1                     0x24            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_10                    0x1                     0x28            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_11                    0x1                     0x2C            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_12                    0x1                     0x30            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_13                    0x1                     0x34            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_14                    0x1                     0x38            0x4             0xD     18      0               1
+AD16.SEQUENCE_DMA_15                    0x1                     0x3C            0x4             0xD     18      0               1

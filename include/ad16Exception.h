@@ -12,7 +12,7 @@ namespace mtca4u
 
       /** The different error types of the ad16Exception.
        */
-      enum { ILLEGAL_PARAMETER, CHANNEL_OUT_OF_RANGE };
+      enum { ILLEGAL_PARAMETER, CHANNEL_OUT_OF_RANGE, CONVERSION_RUNNING };
 
       ad16Exception(const std::string & message, unsigned int id):
         exBase(message, id) {}
