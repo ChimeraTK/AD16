@@ -25,12 +25,10 @@ BOOST_PYTHON_MODULE(libad16)
     ;
 
   enum_<ad16::rate>("rate")
-    .value("10000Hz",ad16::RATE_10000Hz)
-    .value("5000Hz", ad16::RATE_5000Hz)
-    .value("3333Hz", ad16::RATE_3333Hz)
-    .value("2500Hz", ad16::RATE_2500Hz)
-    .value("2000Hz", ad16::RATE_2000Hz)
-    .value("1000Hz", ad16::RATE_1000Hz)
-    .value("100Hz", ad16::RATE_100Hz)
+    .value("Hz100000",ad16::RATE_100000Hz)
+    .value("Hz50000", ad16::RATE_50000Hz)
+    .value("Hz10000", ad16::RATE_10000Hz)
+    .value("Hz5000", ad16::RATE_5000Hz)
+    .value("Hz1000", ad16::RATE_1000Hz)
   ;
 }

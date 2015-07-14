@@ -28,15 +28,40 @@ class MainWindow(QtGui.QMainWindow):
 
     def __init__(self):
         super(MainWindow, self).__init__()
+
+        
+        self.grid = QtGui.QGridLayout()
+        self.grid.setSpacing(10)
+
+        self.plot = pg.PlotWidget()
+        self.curve = self.plot.plot()
+        self.plot.setRange(QtCore.QRectF(0, -300000, 1000, 600000))
+        self.grid.addWidget(self.plot,1,0,1,2)
+        
+        self.text1 = QtGui.QLabel('Sampling rate:')
+        self.grid.addWidget(self.text1,2,0)
+        self.samplingRate = QtGui.QComboBox()
+        self.samplingRate.addItem("100 kHz", libad16.rate.Hz100000)
+        self.samplingRate.addItem("50 kHz", libad16.rate.Hz50000)
+        self.samplingRate.addItem("10 kHz", libad16.rate.Hz10000)
+        self.samplingRate.addItem("5 kHz", libad16.rate.Hz5000)
+        self.samplingRate.addItem("1 kHz", libad16.rate.Hz1000)
+        self.grid.addWidget(self.samplingRate,2,1)
+        
+        self.text2 = QtGui.QLabel('Number of samples per channel:')
+        self.grid.addWidget(self.text2,3,0)
+        self.samples = QtGui.QSpinBox()
+        self.samples.setRange(1,100000)
+        self.samples.setValue(1024)
+        self.grid.addWidget(self.samples,3,1)
+
+        self.widget = QtGui.QWidget();
+        self.widget.setLayout(self.grid);
+        self.setCentralWidget(self.widget);
+
         self.setWindowTitle("PyQT ADC scope")
         self.resize(800, 600)
         self.makeMenu()
-
-        self.plot = pg.PlotWidget()
-        #self.plot = self.plotW.plot()
-        self.curve = self.plot.plot()
-        self.plot.setRange(QtCore.QRectF(0, -300000, 1000, 600000))
-        self.setCentralWidget(self.plot)
 
         self.statusBar = QtGui.QStatusBar()
         self.setStatusBar(self.statusBar)
@@ -79,12 +104,14 @@ class MainWindow(QtGui.QMainWindow):
         '''
         Here goes all the magic
         '''
-        fps = 1/(time.time() - self.start_time)
-        self.counter += 1
         
         # check if conversion is complete
         if self.ad16.conversionComplete() == 0:
             return
+
+        # compute fps
+        fps = 1/(time.time() - self.start_time)
+        self.counter += 1
 
         # get data
         self.start_time = time.time()
@@ -114,6 +141,9 @@ class MainWindow(QtGui.QMainWindow):
             1000 * (time_plot_image - time_calc_image)))
 
         # start the next conversion
+        val = self.samplingRate.itemData(self.samplingRate.currentIndex()).toPyObject()
+        self.ad16.setSamplingRate(val)
+        self.ad16.setSamplesPerBlock( self.samples.value() )
         self.ad16.startConversion()
         
 
@@ -121,5 +151,4 @@ class MainWindow(QtGui.QMainWindow):
 if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
     mainWin = MainWindow()
-    mainWin.show()
     sys.exit(app.exec_())

@@ -18,7 +18,7 @@ namespace mtca4u{
   class ad16 {
     public:
 
-      ad16() {};
+      ad16() : samplesPerBlock(1024) {};
       ~ad16() {};
 
       /// Open AD16 device. Currently only a dummy device can be opened. The dummy device is selected by setting both arguments to the mapping file name.
@@ -27,8 +27,8 @@ namespace mtca4u{
       /// Close AD16 device.
       void close();
 
-      /// possible sampling rates
-      enum rate { RATE_10000Hz=1, RATE_5000Hz=2, RATE_3333Hz=3, RATE_2500Hz=4, RATE_2000Hz=5, RATE_1000Hz=10, RATE_100Hz=100 };
+      /// possible sampling rates (base sample rate is assumed to be 100 kHz)
+      enum rate { RATE_100000Hz=1, RATE_50000Hz=2, RATE_25000Hz=4, RATE_20000Hz=5, RATE_10000Hz=10, RATE_5000Hz=20, RATE_1000Hz=100 };
 
       /// set sampling rate rivisor (see enum type above)
       void setSamplingRate(int divisor);
@@ -58,6 +58,9 @@ namespace mtca4u{
 
       /// accessor for multiplexed data
       boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
+
+      /// number of samples per conversion block and channel
+      unsigned int samplesPerBlock;
 
 
   };

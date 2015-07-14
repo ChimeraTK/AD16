@@ -31,6 +31,7 @@ namespace mtca4u{
 
   /*************************************************************************************************/
   void ad16::setSamplesPerBlock(int samples) {
+    samplesPerBlock = samples;
     _mappedDevice.writeReg("SAMPLES_PER_BLOCK", "AD16", &samples);
   }
 
@@ -63,8 +64,22 @@ namespace mtca4u{
       throw ad16Exception("Conversion still running",ad16Exception::CONVERSION_RUNNING);
     }
 
-    // if not yet done, create accessor for multiplexed data
-    if(!dataDemuxed) dataDemuxed = _mappedDevice.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DMA", "AD16");
+    // Create accessor for multiplexed data
+    // This contains currently an ugly work-around to reduce the amount of read data to what is needed. The number of
+    // samples set by the user is used to reduce the length of the area read via DMA. This is currently not possible
+    // with getCustomAccessor(), so we need to create the accessor manually.
+    // TODO: It currently contains hardcoded information which should be obtained from the map file!
+    SequenceInfo areaInfo;
+    _mappedDevice.getRegisterMap()->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_DMA",areaInfo,"AD16");
+    std::vector< FixedPointConverter > converters;
+    for(int i=0; i<16; i++) converters.push_back(FixedPointConverter(18,0,true));
+    if(areaInfo.reg_elem_nr > 16*samplesPerBlock) areaInfo.reg_elem_nr = 16*samplesPerBlock;
+    areaInfo.reg_size = 4*areaInfo.reg_elem_nr;
+    dataDemuxed = boost::shared_ptr< FixedTypeMuxedDataAccessor< int32_t, int32_t > > (
+        new FixedTypeMuxedDataAccessor< int32_t, int32_t >(_dummyDevice,areaInfo,converters) );
+
+    // this was the original command which does not allow the flexibility to read only needed data
+    // dataDemuxed = _mappedDevice.getCustomAccessor< MultiplexedDataAccessor<int32_t> >("DMA", "AD16");
 
     // read data
     dataDemuxed->read();

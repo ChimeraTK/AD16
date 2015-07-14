@@ -5,7 +5,7 @@
 AD16.START_CONVERSION                   0x1                     0x0             0x4             0x0     16      0               0
 
 # Set sampling rate divisor.
-# 1 will be 100kHz, 2 50kHz etc.
+# 1 will be 100kHz, 2 is 50kHz etc.
 AD16.SAMPLING_RATE_DIV                  0x1                     0x4             0x4             0x0     16      0               0
 
 # Set number of samples per conversion block and channel.
@@ -13,7 +13,7 @@ AD16.SAMPLING_RATE_DIV                  0x1                     0x4             
 AD16.SAMPLES_PER_BLOCK                  0x1                     0x8             0x4             0x0     32      0               0
 
 # Multiplexed DMA area for ADC raw data
-AD16.AREA_MULTIPLEXED_SEQUENCE_DMA      0x4000                  0x0             0x10000         0xD
+AD16.AREA_MULTIPLEXED_SEQUENCE_DMA      0x400000                0x0             0x1000000       0xD
 AD16.SEQUENCE_DMA_0                     0x1                     0x00            0x4             0xD     18      0               1
 AD16.SEQUENCE_DMA_1                     0x1                     0x04            0x4             0xD     18      0               1
 AD16.SEQUENCE_DMA_2                     0x1                     0x08            0x4             0xD     18      0               1
