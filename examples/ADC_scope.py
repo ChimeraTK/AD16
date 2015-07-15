@@ -34,9 +34,13 @@ class MainWindow(QtGui.QMainWindow):
         self.grid.setSpacing(10)
 
         self.plot = pg.PlotWidget()
-        self.curve = self.plot.plot()
-        self.plot.setRange(QtCore.QRectF(0, -300000, 1000, 600000))
-        self.grid.addWidget(self.plot,1,0,1,2)
+        self.curve = []
+        for i in range(0,16):
+            myplot = self.plot.plot()
+            myplot.setPen(pg.mkPen(pg.intColor(i)))
+            self.curve.append(myplot)
+        self.plot.setRange(QtCore.QRectF(0, -150000, 1000, 300000))
+        self.grid.addWidget(self.plot,1,0,1,33)
         
         self.text1 = QtGui.QLabel('Sampling rate:')
         self.grid.addWidget(self.text1,2,0)
@@ -46,14 +50,31 @@ class MainWindow(QtGui.QMainWindow):
         self.samplingRate.addItem("10 kHz", libad16.rate.Hz10000)
         self.samplingRate.addItem("5 kHz", libad16.rate.Hz5000)
         self.samplingRate.addItem("1 kHz", libad16.rate.Hz1000)
-        self.grid.addWidget(self.samplingRate,2,1)
+        self.grid.addWidget(self.samplingRate,2,1,1,3)
         
         self.text2 = QtGui.QLabel('Number of samples per channel:')
         self.grid.addWidget(self.text2,3,0)
         self.samples = QtGui.QSpinBox()
         self.samples.setRange(1,100000)
         self.samples.setValue(1024)
-        self.grid.addWidget(self.samples,3,1)
+        self.grid.addWidget(self.samples,3,1,1,3)
+        
+        self.text3 = QtGui.QLabel('Channels:')
+        self.grid.addWidget(self.text3,4,0)
+        self.chn = []
+        self.chnlabel = []
+        for i in range(0,16):
+            self.chn.append(QtGui.QCheckBox())
+            if i == 1:
+                self.chn[i].setChecked(1)
+            self.grid.addWidget(self.chn[i],4,1+2*i)
+            self.chnlabel.append(QtGui.QLabel(str(i)))
+            
+            pal = QtGui.QPalette()
+            pal.setColor(QtGui.QPalette.WindowText, pg.intColor(i))
+            self.chnlabel[i].setPalette(pal)
+            
+            self.grid.addWidget(self.chnlabel[i],4,2+2*i)
 
         self.widget = QtGui.QWidget();
         self.widget.setLayout(self.grid);
@@ -61,6 +82,7 @@ class MainWindow(QtGui.QMainWindow):
 
         self.setWindowTitle("PyQT ADC scope")
         self.resize(800, 600)
+          
         self.makeMenu()
 
         self.statusBar = QtGui.QStatusBar()
@@ -72,6 +94,7 @@ class MainWindow(QtGui.QMainWindow):
         # open AD16 and start first conversion
         self.ad16 = libad16.ad16()
         self.ad16.open("ad16dummy.map","ad16dummy.map")
+        self.ad16.setMode(libad16.mode.AUTO_TRIGGER)
         self.ad16.startConversion()
         
         # start the automatic update
@@ -116,7 +139,9 @@ class MainWindow(QtGui.QMainWindow):
         # get data
         self.start_time = time.time()
         self.ad16.read()
-        signal = self.ad16.getChannelData(1)
+        signal = []
+        for i in range(0,16):
+            signal.append(self.ad16.getChannelData(i))
 
         # calculate something
         time_get_image = time.time()
@@ -125,7 +150,12 @@ class MainWindow(QtGui.QMainWindow):
         time_calc_image = time.time()
         
         # plot the signal
-        self.curve.setData(signal)
+        for i in range(0,16):
+            if self.chn[i].isChecked():
+                self.curve[i].setData(signal[i])
+            else:
+                self.curve[i].clear()
+
         time_plot_image = time.time()
         
         # What the hell is going on ... put info into statusbar
@@ -144,7 +174,7 @@ class MainWindow(QtGui.QMainWindow):
         val = self.samplingRate.itemData(self.samplingRate.currentIndex()).toPyObject()
         self.ad16.setSamplingRate(val)
         self.ad16.setSamplesPerBlock( self.samples.value() )
-        self.ad16.startConversion()
+        #self.ad16.startConversion()
         
 
        
