@@ -19,7 +19,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 --coverage")
 # linker flags
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--export-dynamic")
 
-FIND_PACKAGE(MtcaMappedDevice 00.09 REQUIRED)
+FIND_PACKAGE(MtcaMappedDevice 00.17 REQUIRED)
 include_directories(SYSTEM ${MtcaMappedDevice_INCLUDE_DIRS})
 
 FIND_PACKAGE(Boost COMPONENTS thread REQUIRED)
