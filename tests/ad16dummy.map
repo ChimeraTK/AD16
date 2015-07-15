@@ -1,32 +1,66 @@
-# name                                  nr of elements          address         size            bar     width   fracbits        signed   
+# name                                      nr of elements          address         size            bar     width   fracbits        signed   
 
-# Write 1 to this register to start a conversion.
-# The register will be set to 0 when conversion is complete.
-AD16.START_CONVERSION                   0x1                     0x0             0x4             0x0     16      0               0
+# Mode of operation:
+#  0 = software triggered via START_CONVERSION
+#  1 = hardware triggered by external signal with single buffer
+#  2 = hardware triggered by external signal with double buffer
+#  3 = auto triggered: continuous conversion mode with double buffer
+AD16.MODE                                   0x1                     0x0             0x4             0x0     16      0               0
 
 # Set sampling rate divisor.
 # 1 will be 100kHz, 2 is 50kHz etc.
-AD16.SAMPLING_RATE_DIV                  0x1                     0x4             0x4             0x0     16      0               0
+AD16.SAMPLING_RATE_DIV                      0x1                     0x4             0x4             0x0     16      0               0
 
 # Set number of samples per conversion block and channel.
 # To be able to read the data, AREA_MULTIPLEXED_SEQUENCE_DMA must be configured long enough.
-AD16.SAMPLES_PER_BLOCK                  0x1                     0x8             0x4             0x0     32      0               0
+AD16.SAMPLES_PER_BLOCK                      0x1                     0x8             0x4             0x0     32      0               0
+
+# In software trigger mode, write 1 to this register to start a conversion.
+# In case of external trigger, the register will be set to 1 when a trigger signal is recieved.
+# In case of auto trigger mode, the register will always contain 1.
+# In all modes, the register will be set to 0 when conversion is complete.
+AD16.CONVERSION_RUNNING                     0x1                     0xC             0x4             0x0     16      0               0
+
+# Last written buffer
+#  0 = buffer A contains data from last conversion (buffer B might be currently written to by the ADC)
+#  1 = buffer B contains data from last conversion (buffer A might be currently written to by the ADC)
+# In case of single buffering this register will always contain 0.
+AD16.LAST_BUFFER                            0x1                     0x10            0x4             0x0     16      0               0
 
 # Multiplexed DMA area for ADC raw data
-AD16.AREA_MULTIPLEXED_SEQUENCE_DMA      0x400000                0x0             0x1000000       0xD
-AD16.SEQUENCE_DMA_0                     0x1                     0x00            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_1                     0x1                     0x04            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_2                     0x1                     0x08            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_3                     0x1                     0x0C            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_4                     0x1                     0x10            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_5                     0x1                     0x14            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_6                     0x1                     0x18            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_7                     0x1                     0x1C            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_8                     0x1                     0x20            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_9                     0x1                     0x24            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_10                    0x1                     0x28            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_11                    0x1                     0x2C            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_12                    0x1                     0x30            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_13                    0x1                     0x34            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_14                    0x1                     0x38            0x4             0xD     18      0               1
-AD16.SEQUENCE_DMA_15                    0x1                     0x3C            0x4             0xD     18      0               1
+# There are two buffers used for double buffering in case of continuous conversion mode. Otherwise only BUFFER_A is used
+AD16.AREA_MULTIPLEXED_SEQUENCE_BUFFER_A     0x400000                0x0             0x1000000       0xD
+AD16.SEQUENCE_BUFFER_A_0                    0x1                     0x00            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_1                    0x1                     0x04            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_2                    0x1                     0x08            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_3                    0x1                     0x0C            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_4                    0x1                     0x10            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_5                    0x1                     0x14            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_6                    0x1                     0x18            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_7                    0x1                     0x1C            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_8                    0x1                     0x20            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_9                    0x1                     0x24            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_10                   0x1                     0x28            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_11                   0x1                     0x2C            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_12                   0x1                     0x30            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_13                   0x1                     0x34            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_14                   0x1                     0x38            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_A_15                   0x1                     0x3C            0x4             0xD     18      0               1
+
+AD16.AREA_MULTIPLEXED_SEQUENCE_BUFFER_B     0x400000                0x10000000      0x1000000       0xD
+AD16.SEQUENCE_BUFFER_B_0                    0x1                     0x00            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_1                    0x1                     0x04            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_2                    0x1                     0x08            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_3                    0x1                     0x0C            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_4                    0x1                     0x10            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_5                    0x1                     0x14            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_6                    0x1                     0x18            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_7                    0x1                     0x1C            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_8                    0x1                     0x20            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_9                    0x1                     0x24            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_10                   0x1                     0x28            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_11                   0x1                     0x2C            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_12                   0x1                     0x30            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_13                   0x1                     0x34            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_14                   0x1                     0x38            0x4             0xD     18      0               1
+AD16.SEQUENCE_BUFFER_B_15                   0x1                     0x3C            0x4             0xD     18      0               1

@@ -15,7 +15,10 @@ namespace mtca4u{
     // open dummy device and put into mapped device
     _dummyDevice = boost::shared_ptr<ad16DummyDevice>( new ad16DummyDevice );
     _dummyDevice->openDev(mappingFileName);
-    _mappedDevice.openDev( _dummyDevice, mapFileParser().parse(mappingFileName));
+   _map = mapFileParser().parse(mappingFileName);
+    _mappedDevice.openDev( _dummyDevice, _map);
+
+    // TODO: Set useful default configuration to have a consistent state after each device open
   }
 
   /*************************************************************************************************/
@@ -25,13 +28,19 @@ namespace mtca4u{
   }
 
   /*************************************************************************************************/
+  void ad16::setMode(int mode) {
+    _mode = mode;
+    _mappedDevice.writeReg("MODE", "AD16", &mode);
+  }
+
+  /*************************************************************************************************/
   void ad16::setSamplingRate(int divisor) {
     _mappedDevice.writeReg("SAMPLING_RATE_DIV", "AD16", &divisor);
   }
 
   /*************************************************************************************************/
   void ad16::setSamplesPerBlock(int samples) {
-    samplesPerBlock = samples;
+    _samplesPerBlock = samples;
     _mappedDevice.writeReg("SAMPLES_PER_BLOCK", "AD16", &samples);
   }
 
@@ -45,15 +54,22 @@ namespace mtca4u{
 
     // write to trigger register
     int32_t val = 1;
-    _mappedDevice.writeReg("START_CONVERSION", "AD16", &val);
+    _mappedDevice.writeReg("CONVERSION_RUNNING", "AD16", &val);
   }
 
   /*************************************************************************************************/
   bool ad16::conversionComplete() {
-    // check if conversion is currently running
-    int32_t val;
-    _mappedDevice.readReg("START_CONVERSION", "AD16", &val);
-    return (val == 0);
+    if(_mode == 1 || _mode == 2) {
+      // in case of single buffering, simply check the register
+      int32_t val;
+      _mappedDevice.readReg("CONVERSION_RUNNING", "AD16", &val);
+      return (val == 0);
+    }
+    else {
+      int32_t lastBuffer;
+      _mappedDevice.readReg("LAST_BUFFER","AD16", &lastBuffer);
+      return (lastBuffer != _lastBuffer);
+    }
   }
 
   /*************************************************************************************************/
@@ -64,37 +80,41 @@ namespace mtca4u{
       throw ad16Exception("Conversion still running",ad16Exception::CONVERSION_RUNNING);
     }
 
-    // Create accessor for multiplexed data
-    // This contains currently an ugly work-around to reduce the amount of read data to what is needed. The number of
-    // samples set by the user is used to reduce the length of the area read via DMA. This is currently not possible
-    // with getCustomAccessor(), so we need to create the accessor manually.
-    // TODO: It currently contains hardcoded information which should be obtained from the map file!
-    SequenceInfo areaInfo;
-    _mappedDevice.getRegisterMap()->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_DMA",areaInfo,"AD16");
-    std::vector< FixedPointConverter > converters;
-    for(int i=0; i<16; i++) converters.push_back(FixedPointConverter(18,0,true));
-    if(areaInfo.reg_elem_nr > 16*samplesPerBlock) areaInfo.reg_elem_nr = 16*samplesPerBlock;
-    areaInfo.reg_size = 4*areaInfo.reg_elem_nr;
-    dataDemuxed = boost::shared_ptr< FixedTypeMuxedDataAccessor< int32_t, int32_t > > (
-        new FixedTypeMuxedDataAccessor< int32_t, int32_t >(_dummyDevice,areaInfo,converters) );
+    // determine last written buffer to read from
+    _mappedDevice.readReg("LAST_BUFFER","AD16", &_lastBuffer);
+    std::string bufferName;
+    if(_lastBuffer == 0) {
+      bufferName = "BUFFER_A";
+    }
+    else {
+      bufferName = "BUFFER_B";
+    }
 
-    // this was the original command which does not allow the flexibility to read only needed data
-    // dataDemuxed = _mappedDevice.getCustomAccessor< MultiplexedDataAccessor<int32_t> >("DMA", "AD16");
+    // modify register map so the DMA area has the right length
+    for(mapFile::iterator i = _map->begin(); i != _map->end(); ++i) {
+      if(i->reg_module == "AD16" && i->reg_name == "AREA_MULTIPLEXED_SEQUENCE_"+bufferName) {
+        i->reg_elem_nr = 16*_samplesPerBlock;
+        i->reg_size = 4*i->reg_elem_nr;
+      }
+    }
+
+    // create custom accessor
+    _dataDemuxed = _mappedDevice.getCustomAccessor< MultiplexedDataAccessor<int32_t> >(bufferName, "AD16");
 
     // read data
-    dataDemuxed->read();
+    _dataDemuxed->read();
   }
 
   /*************************************************************************************************/
   std::vector<int> ad16::getChannelData(unsigned int channel) {
 
     // check if channel is in range
-    if(channel > dataDemuxed->getNumberOfDataSequences()){
+    if(channel > _dataDemuxed->getNumberOfDataSequences()){
       throw ad16Exception("Channel number out of range",ad16Exception::CHANNEL_OUT_OF_RANGE);
     }
 
     // return demultiplexed data
-    return (*dataDemuxed)[channel];
+    return (*_dataDemuxed)[channel];
 
   }
 

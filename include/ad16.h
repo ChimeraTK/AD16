@@ -18,7 +18,7 @@ namespace mtca4u{
   class ad16 {
     public:
 
-      ad16() : samplesPerBlock(1024) {};
+      ad16() : _samplesPerBlock(1024), _mode(0), _lastBuffer(-1) {};
       ~ad16() {};
 
       /// Open AD16 device. Currently only a dummy device can be opened. The dummy device is selected by setting both arguments to the mapping file name.
@@ -26,6 +26,12 @@ namespace mtca4u{
 
       /// Close AD16 device.
       void close();
+
+      /// possible operation modes
+      enum mode { SOFTWARE_TRIGGER=0, EXT_TRIGGER=1, EXT_TRIGGER_DOUBLE_BUFFER=2, AUTO_TRIGGER=3 };
+
+      /// set mode of operation
+      void setMode(int mode);
 
       /// possible sampling rates (base sample rate is assumed to be 100 kHz)
       enum rate { RATE_100000Hz=1, RATE_50000Hz=2, RATE_25000Hz=4, RATE_20000Hz=5, RATE_10000Hz=10, RATE_5000Hz=20, RATE_1000Hz=100 };
@@ -50,6 +56,9 @@ namespace mtca4u{
 
     private:
 
+      /// register map
+      boost::shared_ptr<mapFile> _map;
+
       /// our mapped device
       devMap<devBase> _mappedDevice;
 
@@ -57,10 +66,16 @@ namespace mtca4u{
       boost::shared_ptr<ad16DummyDevice> _dummyDevice;
 
       /// accessor for multiplexed data
-      boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
+      boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > _dataDemuxed;
 
       /// number of samples per conversion block and channel
-      unsigned int samplesPerBlock;
+      unsigned int _samplesPerBlock;
+
+      /// mode of operation
+      int _mode;
+
+      /// last buffer read (used to detect completed conversion in case of double buffering)
+      int _lastBuffer;
 
 
   };

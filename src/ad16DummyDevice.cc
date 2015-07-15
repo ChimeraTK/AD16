@@ -12,7 +12,7 @@ namespace mtca4u{
 
     // register callback function for control register write
     mapFile::mapElem elem;
-    _registerMapping->getRegisterInfo("START_CONVERSION", elem, "AD16");
+    _registerMapping->getRegisterInfo("CONVERSION_RUNNING", elem, "AD16");
     setWriteCallbackFunction( AddressRange(elem.reg_address, elem.reg_size, elem.reg_bar),
         boost::bind( &ad16DummyDevice::callbackStartConversion, this ) );
 
@@ -36,43 +36,71 @@ namespace mtca4u{
     // start new conversion
     theThread =  boost::thread( boost::bind(&ad16DummyDevice::threadConversion, this) );
 }
-  void ad16DummyDevice::threadConversion(){
-    mapFile::mapElem elem;
+  void ad16DummyDevice::threadConversion() {
 
-    // wait time the real device would need for the conversion
-    int32_t samplingRateDiv, samplesPerBlock;
+    while(true) {
+      mapFile::mapElem elem;
 
-    _registerMapping->getRegisterInfo("SAMPLING_RATE_DIV", elem, "AD16");
-    readReg(elem.reg_address, &samplingRateDiv, elem.reg_bar);
+      // obtain mode of operation
+      int32_t mode;
+      _registerMapping->getRegisterInfo("MODE", elem, "AD16");
+      readReg(elem.reg_address, &mode, elem.reg_bar);
 
-    _registerMapping->getRegisterInfo("SAMPLES_PER_BLOCK", elem, "AD16");
-    readReg(elem.reg_address, &samplesPerBlock, elem.reg_bar);
-
-    usleep(10*samplingRateDiv*samplesPerBlock);
-
-    // write white noise to ADC data block
-    _registerMapping->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_DMA", elem, "AD16");
-
-    boost::uniform_int<> uniform(0, (1<<18) - 1);    // 18 bit random number
-
-    int ic = 0;
-    if(samplesPerBlock > elem.reg_elem_nr/16) samplesPerBlock = elem.reg_elem_nr/16;  // limit written samples to actual block size
-    for(unsigned int i=0; i<16*samplesPerBlock; i++) {
-      int32_t data;
-      if(i % 16 == 0) {
-        data = ic++;
+      // determine buffer to write to
+      int32_t lastBuffer;
+      _registerMapping->getRegisterInfo("LAST_BUFFER", elem, "AD16");
+      readReg(elem.reg_address, &lastBuffer, elem.reg_bar);
+      int32_t activeBuffer = 0;
+      if(mode == AUTO_TRIGGER && lastBuffer == 0) activeBuffer = 1;
+      std::string buffer_name;
+      if(activeBuffer == 0) {
+        buffer_name = "BUFFER_A";
       }
-      else {
-        data = uniform(rng);
+      else if(activeBuffer == 1) {
+        buffer_name = "BUFFER_B";
       }
-      writeRegisterWithoutCallback(elem.reg_address + i*sizeof(int32_t), data, elem.reg_bar);
+
+      // wait time the real device would need for the conversion
+      int32_t samplingRateDiv, samplesPerBlock;
+
+      _registerMapping->getRegisterInfo("SAMPLING_RATE_DIV", elem, "AD16");
+      readReg(elem.reg_address, &samplingRateDiv, elem.reg_bar);
+
+      _registerMapping->getRegisterInfo("SAMPLES_PER_BLOCK", elem, "AD16");
+      readReg(elem.reg_address, &samplesPerBlock, elem.reg_bar);
+
+      usleep(10*samplingRateDiv*samplesPerBlock);
+
+      // write white noise to ADC data block
+      _registerMapping->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_"+buffer_name, elem, "AD16");
+
+      boost::uniform_int<> uniform(0, (1<<18) - 1);    // 18 bit random number
+
+      int ic = 0;
+      if(static_cast<uint32_t>(samplesPerBlock) > elem.reg_elem_nr/16) samplesPerBlock = elem.reg_elem_nr/16;  // limit written samples to actual block size
+      for(int32_t i=0; i<16*samplesPerBlock; i++) {
+        int32_t data;
+        if(i % 16 == 0) {
+          data = ic++;
+        }
+        else {
+          data = uniform(rng);
+        }
+        writeRegisterWithoutCallback(elem.reg_address + i*sizeof(int32_t), data, elem.reg_bar);
+      }
+
+      // update LAST_BUFFER regiser
+      _registerMapping->getRegisterInfo("LAST_BUFFER", elem, "AD16");
+      writeRegisterWithoutCallback(elem.reg_address, activeBuffer, elem.reg_bar);
+
+      // change START_CONERSION register back to 0 and terminate thread (except in auto trigger mode)
+      if(mode != AUTO_TRIGGER) {
+        _registerMapping->getRegisterInfo("CONVERSION_RUNNING", elem, "AD16");
+        writeRegisterWithoutCallback(elem.reg_address, 0, elem.reg_bar);
+        isConversionRunning = false;
+        return;
+      }
     }
-
-    // change START_CONERSION register back to 0
-    _registerMapping->getRegisterInfo("START_CONVERSION", elem, "AD16");
-    writeRegisterWithoutCallback(elem.reg_address, 0, elem.reg_bar);
-
-    isConversionRunning = false;
   }
 
 

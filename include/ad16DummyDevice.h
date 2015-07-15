@@ -40,6 +40,9 @@ namespace mtca4u{
       /// flag if a conversion is currently running (to prevent starting multiple conversions)
       volatile bool isConversionRunning;
 
+      /// possible operation modes
+      enum mode { SOFTWARE_TRIGGER=0, EXT_TRIGGER=1, EXT_TRIGGER_DOUBLE_BUFFER=2, AUTO_TRIGGER=3 };
+
   };
 
 }//namespace mtca4u

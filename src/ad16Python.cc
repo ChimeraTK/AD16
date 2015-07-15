@@ -16,6 +16,7 @@ BOOST_PYTHON_MODULE(libad16)
   class_<ad16, boost::noncopyable>("ad16")
     .def("open",&ad16::open)
     .def("close",&ad16::close)
+    .def("setMode",&ad16::setMode)
     .def("startConversion",&ad16::startConversion)
     .def("conversionComplete",&ad16::conversionComplete)
     .def("setSamplingRate",&ad16::setSamplingRate)
@@ -30,5 +31,12 @@ BOOST_PYTHON_MODULE(libad16)
     .value("Hz10000", ad16::RATE_10000Hz)
     .value("Hz5000", ad16::RATE_5000Hz)
     .value("Hz1000", ad16::RATE_1000Hz)
+  ;
+
+  enum_<ad16::mode>("mode")
+    .value("SOFTWARE_TRIGGER",ad16::SOFTWARE_TRIGGER)
+    .value("EXT_TRIGGER", ad16::EXT_TRIGGER)
+    .value("EXT_TRIGGER_DOUBLE_BUFFER", ad16::EXT_TRIGGER_DOUBLE_BUFFER)
+    .value("AUTO_TRIGGER", ad16::AUTO_TRIGGER)
   ;
 }
