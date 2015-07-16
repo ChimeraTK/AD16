@@ -170,11 +170,10 @@ class MainWindow(QtGui.QMainWindow):
             1000 * (time_calc_image - time_get_image),
             1000 * (time_plot_image - time_calc_image)))
 
-        # start the next conversion
+        # update sample rate and number of samples
         val = self.samplingRate.itemData(self.samplingRate.currentIndex()).toPyObject()
         self.ad16.setSamplingRate(val)
         self.ad16.setSamplesPerBlock( self.samples.value() )
-        #self.ad16.startConversion()
         
 
        
