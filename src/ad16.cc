@@ -1,6 +1,7 @@
 #include "ad16.h"
 #include <MtcaMappedDevice/DummyDevice.h>
 #include <MtcaMappedDevice/mapFileParser.h>
+#include <MtcaMappedDevice/mapFile.h>
 
 namespace mtca4u{
 
@@ -12,13 +13,28 @@ namespace mtca4u{
       throw ad16Exception("Real devices currently not supported",ad16Exception::ILLEGAL_PARAMETER);
     }
 
-    // open dummy device and put into mapped device
+    // open dummy device
     _dummyDevice = boost::shared_ptr<ad16DummyDevice>( new ad16DummyDevice );
     _dummyDevice->openDev(mappingFileName);
-   _map = mapFileParser().parse(mappingFileName);
+
+    // open map and store maximum number of elements
+    _map = mapFileParser().parse(mappingFileName);
+    mapFile::mapElem areaInfo;
+    _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_BUFFER_A",areaInfo,"AD16");
+    max_elem_nr = areaInfo.reg_elem_nr;
+
+    // check if length of buffer B is the same
+    _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_BUFFER_B",areaInfo,"AD16");
+    if(max_elem_nr != areaInfo.reg_elem_nr) {
+      throw ad16Exception("Number of elements in BUFFER_A and BUFFER_B are not consistent in map file.",ad16Exception::ILLEGAL_PARAMETER);
+    }
+
+    // create mapped device
     _mappedDevice.openDev( _dummyDevice, _map);
 
-    // TODO: Set useful default configuration to have a consistent state after each device open
+    // synchronise state variables with device
+    _mappedDevice.readReg("MODE", "AD16", &_mode);
+
   }
 
   /*************************************************************************************************/
@@ -59,7 +75,7 @@ namespace mtca4u{
 
   /*************************************************************************************************/
   bool ad16::conversionComplete() {
-    if(_mode == 1 || _mode == 2) {
+    if(_mode == 0 || _mode == 1) {
       // in case of single buffering, simply check the register
       int32_t val;
       _mappedDevice.readReg("CONVERSION_RUNNING", "AD16", &val);
@@ -109,7 +125,7 @@ namespace mtca4u{
   std::vector<int> ad16::getChannelData(unsigned int channel) {
 
     // check if channel is in range
-    if(channel > _dataDemuxed->getNumberOfDataSequences()){
+    if(channel > _dataDemuxed->getNumberOfDataSequences()) {
       throw ad16Exception("Channel number out of range",ad16Exception::CHANNEL_OUT_OF_RANGE);
     }
 

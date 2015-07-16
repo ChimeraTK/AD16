@@ -18,7 +18,7 @@ namespace mtca4u{
   class ad16 {
     public:
 
-      ad16() : _samplesPerBlock(1024), _mode(0), _lastBuffer(-1) {};
+      ad16() : _samplesPerBlock(1024), _mode(0), _lastBuffer(-1), max_elem_nr(0) {};
       ~ad16() {};
 
       /// Open AD16 device. Currently only a dummy device can be opened. The dummy device is selected by setting both arguments to the mapping file name.
@@ -76,6 +76,10 @@ namespace mtca4u{
 
       /// last buffer read (used to detect completed conversion in case of double buffering)
       int _lastBuffer;
+
+      /// maximum number of elements in buffers (as defined in the map file)
+      /// this needs to be stored, as the map will be modified at run time (in-memory)
+      uint32_t max_elem_nr;
 
 
   };
