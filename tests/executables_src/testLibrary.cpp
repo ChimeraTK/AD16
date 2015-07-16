@@ -53,23 +53,24 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/ [] )
 void Ad16Test::testSoftwareTriggeredMode(){
 
   // open device
-  std::cout << "ad.open()" << std::endl;
   ad.open(TEST_MAPPING_FILE,TEST_MAPPING_FILE);
 
-  // trigger conversion and read datra
-  std::cout << "ad.startConversion()"<< std::endl;
+  // set number of samples per block
+  ad.setSamplesPerBlock(16);
+
+  // trigger conversion
   ad.startConversion();
-  std::cout << "ad.read()" << std::endl;
+
+  // wait until conversion is complete
+  while(!ad.conversionComplete()) usleep(1);
+
+  // read data
   ad.read();
 
-  // print data
-  for (uint rowCount = 0; rowCount < 16; ++rowCount) {
-    std::vector<int> data = ad.getChannelData(rowCount);
-    std::cout << "Channel " << rowCount << " with " << data.size() << " samples:" << std::endl;
-    for (uint columnCount = 0; columnCount < data.size(); ++columnCount) {
-      std::cout << data[columnCount] << std::endl;
-    }
-    std::cout << std::endl;
+  // compare first channel data
+  std::vector<int> data = ad.getChannelData(0);
+  for (uint columnCount = 0; columnCount < data.size(); ++columnCount) {
+    BOOST_CHECK( data[columnCount] == columnCount );
   }
 
 }
