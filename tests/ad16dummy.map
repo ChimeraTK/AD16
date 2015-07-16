@@ -1,7 +1,7 @@
 # name                                      nr of elements          address         size            bar     width   fracbits        signed   
 
 # Mode of operation:
-#  0 = software triggered via START_CONVERSION
+#  0 = software triggered via CONVERSION_RUNNING
 #  1 = hardware triggered by external signal with single buffer
 #  2 = hardware triggered by external signal with double buffer
 #  3 = auto triggered: continuous conversion mode with double buffer
