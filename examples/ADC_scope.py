@@ -39,42 +39,68 @@ class MainWindow(QtGui.QMainWindow):
             myplot = self.plot.plot()
             myplot.setPen(pg.mkPen(pg.intColor(i)))
             self.curve.append(myplot)
-        self.plot.setRange(QtCore.QRectF(0, -150000, 1000, 300000))
+        self.plot.setRange(QtCore.QRectF(0, -2**17, 65536, 2**18))
         self.grid.addWidget(self.plot,1,0,1,33)
+
+        self.plot2 = pg.PlotWidget()
+        self.curve2 = []
+        for i in range(0,16):
+            myplot = self.plot2.plot()
+            myplot.setPen(pg.mkPen(pg.intColor(i)))
+            self.curve2.append(myplot)
+        self.plot2.setRange(QtCore.QRectF(0, 0, 65536, 5e15))
+        self.grid.addWidget(self.plot2,2,0,1,33)
         
         self.text1 = QtGui.QLabel('Sampling rate:')
-        self.grid.addWidget(self.text1,2,0)
+        self.grid.addWidget(self.text1,3,0)
         self.samplingRate = QtGui.QComboBox()
         self.samplingRate.addItem("100 kHz", libad16.rate.Hz100000)
         self.samplingRate.addItem("50 kHz", libad16.rate.Hz50000)
         self.samplingRate.addItem("10 kHz", libad16.rate.Hz10000)
         self.samplingRate.addItem("5 kHz", libad16.rate.Hz5000)
         self.samplingRate.addItem("1 kHz", libad16.rate.Hz1000)
-        self.grid.addWidget(self.samplingRate,2,1,1,3)
+        self.grid.addWidget(self.samplingRate,3,1,1,3)
         
         self.text2 = QtGui.QLabel('Number of samples per channel:')
-        self.grid.addWidget(self.text2,3,0)
+        self.grid.addWidget(self.text2,4,0)
         self.samples = QtGui.QSpinBox()
         self.samples.setRange(1,100000)
-        self.samples.setValue(1024)
-        self.grid.addWidget(self.samples,3,1,1,3)
+        self.samples.setValue(65536)
+        self.grid.addWidget(self.samples,4,1,1,3)
         
         self.text3 = QtGui.QLabel('Channels:')
-        self.grid.addWidget(self.text3,4,0)
+        self.grid.addWidget(self.text3,5,0)
         self.chn = []
         self.chnlabel = []
         for i in range(0,16):
             self.chn.append(QtGui.QCheckBox())
             if i == 1:
                 self.chn[i].setChecked(1)
-            self.grid.addWidget(self.chn[i],4,1+2*i)
+            self.grid.addWidget(self.chn[i],5,1+2*i)
             self.chnlabel.append(QtGui.QLabel(str(i)))
             
             pal = QtGui.QPalette()
             pal.setColor(QtGui.QPalette.WindowText, pg.intColor(i))
             self.chnlabel[i].setPalette(pal)
             
-            self.grid.addWidget(self.chnlabel[i],4,2+2*i)
+            self.grid.addWidget(self.chnlabel[i],5,2+2*i)
+        
+        self.text4 = QtGui.QLabel('FFT:')
+        self.grid.addWidget(self.text4,6,0)
+        self.fft = []
+        self.fftlabel = []
+        for i in range(0,16):
+            self.fft.append(QtGui.QCheckBox())
+            if i == 1:
+                self.fft[i].setChecked(1)
+            self.grid.addWidget(self.fft[i],6,1+2*i)
+            self.fftlabel.append(QtGui.QLabel(str(i)))
+            
+            pal = QtGui.QPalette()
+            pal.setColor(QtGui.QPalette.WindowText, pg.intColor(i))
+            self.fftlabel[i].setPalette(pal)
+            
+            self.grid.addWidget(self.fftlabel[i],6,2+2*i)
 
         self.widget = QtGui.QWidget();
         self.widget.setLayout(self.grid);
@@ -94,7 +120,7 @@ class MainWindow(QtGui.QMainWindow):
         # open AD16 and start first conversion
         self.ad16 = libad16.ad16()
         self.ad16.open("ad16dummy.map","ad16dummy.map")
-        self.ad16.setMode(libad16.mode.AUTO_TRIGGER)
+        #self.ad16.setMode(libad16.mode.AUTO_TRIGGER)
         self.ad16.startConversion()
         
         # start the automatic update
@@ -135,18 +161,27 @@ class MainWindow(QtGui.QMainWindow):
         # compute fps
         fps = 1/(time.time() - self.start_time)
         self.counter += 1
+        self.start_time = time.time()
 
         # get data
-        self.start_time = time.time()
         self.ad16.read()
         signal = []
         for i in range(0,16):
             signal.append(self.ad16.getChannelData(i))
-
-        # calculate something
-        time_get_image = time.time()
         
-        # draw everything
+        # take time for obtaining the data
+        time_get_image = time.time()
+
+        # calculate fourier transform
+        powerspectrum = []
+        for i in range(0,16):
+            if self.fft[i].isChecked():
+                powerspectrum.append(np.abs(np.fft.fft(signal[i]))**2)
+            else:
+                powerspectrum.append([])
+        
+        
+        # take time for the calculations
         time_calc_image = time.time()
         
         # plot the signal
@@ -155,7 +190,15 @@ class MainWindow(QtGui.QMainWindow):
                 self.curve[i].setData(signal[i])
             else:
                 self.curve[i].clear()
+        
+        # plot the power spectrum
+        for i in range(0,16):
+            if self.fft[i].isChecked():
+                self.curve2[i].setData(powerspectrum[i])
+            else:
+                self.curve2[i].clear()
 
+        # take time for plotting
         time_plot_image = time.time()
         
         # What the hell is going on ... put info into statusbar
@@ -169,11 +212,14 @@ class MainWindow(QtGui.QMainWindow):
             1000 * (time_get_image - self.start_time),
             1000 * (time_calc_image - time_get_image),
             1000 * (time_plot_image - time_calc_image)))
+        
+        # trigger next conversion
+        self.ad16.startConversion()
 
         # update sample rate and number of samples
-        val = self.samplingRate.itemData(self.samplingRate.currentIndex()).toPyObject()
-        self.ad16.setSamplingRate(val)
-        self.ad16.setSamplesPerBlock( self.samples.value() )
+        #val = self.samplingRate.itemData(self.samplingRate.currentIndex()).toPyObject()
+        #self.ad16.setSamplingRate(val)
+        #self.ad16.setSamplesPerBlock( self.samples.value() )
         
 
        

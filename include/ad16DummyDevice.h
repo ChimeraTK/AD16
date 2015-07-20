@@ -18,7 +18,7 @@ namespace mtca4u{
   {
     public:
 
-      ad16DummyDevice() : isConversionRunning(false) {}
+      ad16DummyDevice() : isConversionRunning(false),currentPosition(0) {}
       virtual ~ad16DummyDevice() {}
 
       virtual void openDev (const std::string &mappingFileName, int perm=O_RDWR, devConfigBase *pConfig=NULL);
@@ -41,7 +41,13 @@ namespace mtca4u{
       volatile bool isConversionRunning;
 
       /// possible operation modes
-      enum mode { SOFTWARE_TRIGGER=0, EXT_TRIGGER=1, EXT_TRIGGER_DOUBLE_BUFFER=2, AUTO_TRIGGER=3 };
+      enum mode { SOFTWARE_TRIGGER=8, AUTO_TRIGGER=0 };
+
+      /// current write position in buffer
+      int32_t currentPosition;
+
+      /// number of channels
+      const static int32_t numberOfChannels;
 
   };
 

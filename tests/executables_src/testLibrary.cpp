@@ -56,7 +56,7 @@ void Ad16Test::testSoftwareTriggeredMode(){
   ad.open(TEST_MAPPING_FILE,TEST_MAPPING_FILE);
 
   // set number of samples per block
-  ad.setSamplesPerBlock(16);
+  //ad.setSamplesPerBlock(16);
 
   // trigger conversion
   ad.startConversion();
@@ -70,7 +70,7 @@ void Ad16Test::testSoftwareTriggeredMode(){
   // compare first channel data
   std::vector<int> data = ad.getChannelData(0);
   for (uint columnCount = 0; columnCount < data.size(); ++columnCount) {
-    BOOST_CHECK( data[columnCount] == columnCount );
+    BOOST_CHECK( data[columnCount] == (int)columnCount );
   }
 
 }

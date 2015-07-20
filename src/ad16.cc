@@ -4,6 +4,7 @@
 #include <MtcaMappedDevice/mapFile.h>
 
 namespace mtca4u{
+  const int32_t ad16::numberOfChannels = 16;
 
   /*************************************************************************************************/
   void ad16::open(const std::string &deviceFileName, const std::string &mappingFileName) {
@@ -20,20 +21,53 @@ namespace mtca4u{
     // open map and store maximum number of elements
     _map = mapFileParser().parse(mappingFileName);
     mapFile::mapElem areaInfo;
-    _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_BUFFER_A",areaInfo,"AD16");
+    _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_BUFFER",areaInfo,"BOARD0");
     max_elem_nr = areaInfo.reg_elem_nr;
 
-    // check if length of buffer B is the same
+    /* no double buffering supported by the current firmware...
+    /// check if length of buffer B is the same
     _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_BUFFER_B",areaInfo,"AD16");
     if(max_elem_nr != areaInfo.reg_elem_nr) {
       throw ad16Exception("Number of elements in BUFFER_A and BUFFER_B are not consistent in map file.",ad16Exception::ILLEGAL_PARAMETER);
     }
+    */
 
     // create mapped device
     _mappedDevice.openDev( _dummyDevice, _map);
 
-    // synchronise state variables with device
-    _mappedDevice.readReg("MODE", "AD16", &_mode);
+    // Initialise device. Procedure taken from Matlab code "ad16_init.m" by Lukasz Butkowski
+    int32_t val;
+
+    // send reset
+    val = 0;
+    _mappedDevice.writeReg("WORD_ADC_ENA","AD160",&val);
+    val = 0;
+    _mappedDevice.writeReg("WORD_RESET_N","BOARD0",&val);
+    usleep(100000); // 0.1 seconds
+
+    // set trigger to user trigger
+    val = 8;
+    _mappedDevice.writeReg("WORD_TIMING_TRG_SEL","APP0",&val);
+
+    // enable data taking
+    val = 1;
+    _mappedDevice.writeReg("WORD_DAQ_ENABLE","APP0",&val);
+
+    // complete initialisation
+    val = 1;
+    _mappedDevice.writeReg("WORD_RESET_N","BOARD0",&val);
+    usleep(100000); // 0.1 seconds
+
+    val = 1;
+    _mappedDevice.writeReg("WORD_ADC_RESET","AD160",&val);
+    usleep(1000000); // 1 seconds
+
+    val = 0;
+    _mappedDevice.writeReg("WORD_ADC_RESET","AD160",&val);
+    usleep(1000000); // 1 seconds
+
+    val = 1;
+    _mappedDevice.writeReg("WORD_ADC_ENA","AD160",&val);
 
   }
 
@@ -45,19 +79,22 @@ namespace mtca4u{
 
   /*************************************************************************************************/
   void ad16::setMode(int mode) {
-    _mode = mode;
-    _mappedDevice.writeReg("MODE", "AD16", &mode);
+    throw ad16Exception("Trigger mode cannot be changed currently",ad16Exception::NOT_IMPLEMENTED);
+    //_mode = mode;
+    //_mappedDevice.writeReg("MODE", "AD16", &mode);
   }
 
   /*************************************************************************************************/
   void ad16::setSamplingRate(int divisor) {
-    _mappedDevice.writeReg("SAMPLING_RATE_DIV", "AD16", &divisor);
+    throw ad16Exception("Sample rate cannot be changed in current firmware",ad16Exception::NOT_IMPLEMENTED);
+    //_mappedDevice.writeReg("SAMPLING_RATE_DIV", "AD16", &divisor);
   }
 
   /*************************************************************************************************/
   void ad16::setSamplesPerBlock(int samples) {
-    _samplesPerBlock = samples;
-    _mappedDevice.writeReg("SAMPLES_PER_BLOCK", "AD16", &samples);
+    throw ad16Exception("Samples per block cannot be changed in current firmware",ad16Exception::NOT_IMPLEMENTED);
+    //_samplesPerBlock = samples;
+    //_mappedDevice.writeReg("SAMPLES_PER_BLOCK", "AD16", &samples);
   }
 
   /*************************************************************************************************/
@@ -68,13 +105,18 @@ namespace mtca4u{
       throw ad16Exception("Conversion already running",ad16Exception::CONVERSION_RUNNING);
     }
 
+    // save starting time
+    t0 = boost::posix_time::microsec_clock::local_time();
+
     // write to trigger register
     int32_t val = 1;
-    _mappedDevice.writeReg("CONVERSION_RUNNING", "AD16", &val);
+    _mappedDevice.writeReg("WORD_TIMING_USER_TRG", "APP0", &val);
   }
 
   /*************************************************************************************************/
   bool ad16::conversionComplete() {
+
+    /* currently not implemented in firmware
     if(_mode == 0 || _mode == 1) {
       // in case of single buffering, simply check the register
       int32_t val;
@@ -86,6 +128,13 @@ namespace mtca4u{
       _mappedDevice.readReg("LAST_BUFFER","AD16", &lastBuffer);
       return (lastBuffer != _lastBuffer);
     }
+    */
+
+    // instead check timing (assume a conversion takes 1 second at most)
+    boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
+    boost::posix_time::time_duration dt = t1-t0;
+    if(dt.total_milliseconds() < 1000) return false;
+    return true;
   }
 
   /*************************************************************************************************/
@@ -97,6 +146,7 @@ namespace mtca4u{
     }
 
     // determine last written buffer to read from
+    /* no double buffering in current firmware
     _mappedDevice.readReg("LAST_BUFFER","AD16", &_lastBuffer);
     std::string bufferName;
     if(_lastBuffer == 0) {
@@ -105,17 +155,19 @@ namespace mtca4u{
     else {
       bufferName = "BUFFER_B";
     }
+    */
+    std::string bufferName = "BUFFER";
 
     // modify register map so the DMA area has the right length
     for(mapFile::iterator i = _map->begin(); i != _map->end(); ++i) {
-      if(i->reg_module == "AD16" && i->reg_name == "AREA_MULTIPLEXED_SEQUENCE_"+bufferName) {
-        i->reg_elem_nr = 16*_samplesPerBlock;
-        i->reg_size = 4*i->reg_elem_nr;
+      if(i->reg_module == "BOARD0" && i->reg_name == "AREA_MULTIPLEXED_SEQUENCE_"+bufferName) {
+        i->reg_elem_nr = numberOfChannels*_samplesPerBlock;
+        i->reg_size = sizeof(int32_t)*i->reg_elem_nr;
       }
     }
 
     // create custom accessor
-    _dataDemuxed = _mappedDevice.getCustomAccessor< MultiplexedDataAccessor<int32_t> >(bufferName, "AD16");
+    _dataDemuxed = _mappedDevice.getCustomAccessor< MultiplexedDataAccessor<int32_t> >(bufferName, "BOARD0");
 
     // read data
     _dataDemuxed->read();

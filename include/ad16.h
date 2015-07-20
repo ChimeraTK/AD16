@@ -18,7 +18,7 @@ namespace mtca4u{
   class ad16 {
     public:
 
-      ad16() : _samplesPerBlock(1024), _mode(0), _lastBuffer(-1), max_elem_nr(0) {};
+      ad16() : _samplesPerBlock(65536), _mode(0), _lastBuffer(-1), max_elem_nr(0) {};
       ~ad16() {};
 
       /// Open AD16 device. Currently only a dummy device can be opened. The dummy device is selected by setting both arguments to the mapping file name.
@@ -28,7 +28,7 @@ namespace mtca4u{
       void close();
 
       /// possible operation modes
-      enum mode { SOFTWARE_TRIGGER=0, EXT_TRIGGER=1, EXT_TRIGGER_DOUBLE_BUFFER=2, AUTO_TRIGGER=3 };
+      enum mode { SOFTWARE_TRIGGER=8, AUTO_TRIGGER=0 };
 
       /// set mode of operation
       void setMode(int mode);
@@ -53,6 +53,9 @@ namespace mtca4u{
 
       /// Get data for single channel after a previous read()
       std::vector<int> getChannelData(unsigned int channel);
+
+      /// number of channels (constant)
+      const static int32_t numberOfChannels;
 
     private:
 
@@ -80,6 +83,9 @@ namespace mtca4u{
       /// maximum number of elements in buffers (as defined in the map file)
       /// this needs to be stored, as the map will be modified at run time (in-memory)
       uint32_t max_elem_nr;
+
+      /// start time of last conversion
+      boost::posix_time::ptime t0;
 
 
   };

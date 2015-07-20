@@ -1,66 +1,104 @@
 # name                                      nr of elements          address         size            bar     width   fracbits        signed   
+APP0.WORD_FIRMWARE                                     1    0   4   1
+APP0.WORD_REVISION                                     1    4   4   1
+APP0.WORD_TIMESTAMP                                    1    8   4   1
+APP0.WORD_STATUS                                       1    12  4   1
+APP0.WORD_DAQ_ENABLE                                   1    80  4   1
 
-# Mode of operation:
-#  0 = software triggered via CONVERSION_RUNNING
-#  1 = hardware triggered by external signal with single buffer
-#  2 = hardware triggered by external signal with double buffer
-#  3 = auto triggered: continuous conversion mode with double buffer
-AD16.MODE                                   0x1                     0x0             0x4             0x0     16      0               0
+# Trigger frequency divider for APP0.WORD_TIMING_TRG_SEL = 0
+# The frequency of the internal trigger is 50Mhz / APP0.WORD_TIMING_FREQ[0]
+APP0.WORD_TIMING_FREQ                                  9    96  36  1
 
-# Set sampling rate divisor.
-# 1 will be 100kHz, 2 is 50kHz etc.
-AD16.SAMPLING_RATE_DIV                      0x1                     0x4             0x4             0x0     16      0               0
+APP0.WORD_TIMING_INT_ENA                               1    136 4   1
+APP0.WORD_TIMING_CNT                                   9    140 36  1
 
-# Set number of samples per conversion block and channel.
-# To be able to read the data, AREA_MULTIPLEXED_SEQUENCE_DMA must be configured long enough.
-AD16.SAMPLES_PER_BLOCK                      0x1                     0x8             0x4             0x0     32      0               0
+# Select trigger mode:
+#  0 = internal trigger with the frequency stated in APP0.WORD_TIMING_FREQ
+#  8 = user trigger by writing to APP0.WORD_TIMING_USER_TRG
+APP0.WORD_TIMING_TRG_SEL                               1    180 4   1
 
-# In software trigger mode, write 1 to this register to start a conversion.
-# In case of external trigger, the register will be set to 1 when a trigger signal is recieved.
-# In case of auto trigger mode, the register will always contain 1.
-# In all modes, the register will be set to 0 when conversion is complete.
-AD16.CONVERSION_RUNNING                     0x1                     0xC             0x4             0x0     16      0               0
+# write to this register to trigger conversion in case of APP0.WORD_TIMING_TRG_SEL = 8
+APP0.WORD_TIMING_USER_TRG                              1    184 4   1
 
-# Last written buffer
-#  0 = buffer A contains data from last conversion (buffer B might be currently written to by the ADC)
-#  1 = buffer B contains data from last conversion (buffer A might be currently written to by the ADC)
-# In case of single buffering this register will always contain 0.
-AD16.LAST_BUFFER                            0x1                     0x10            0x4             0x0     16      0               0
+APP0.WORD_USER                                         1    524 4   1
+APP0.FMC_AD16                                          256  2048    1024    1
 
-# Multiplexed DMA area for ADC raw data
-# There are two buffers used for double buffering in case of continuous conversion mode. Otherwise only BUFFER_A is used
-AD16.AREA_MULTIPLEXED_SEQUENCE_BUFFER_A     0x400000                0x0             0x1000000       0xD
-AD16.SEQUENCE_BUFFER_A_0                    0x1                     0x00            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_1                    0x1                     0x04            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_2                    0x1                     0x08            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_3                    0x1                     0x0C            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_4                    0x1                     0x10            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_5                    0x1                     0x14            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_6                    0x1                     0x18            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_7                    0x1                     0x1C            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_8                    0x1                     0x20            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_9                    0x1                     0x24            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_10                   0x1                     0x28            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_11                   0x1                     0x2C            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_12                   0x1                     0x30            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_13                   0x1                     0x34            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_14                   0x1                     0x38            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_A_15                   0x1                     0x3C            0x4             0xD     18      0               1
+AD160.SHAPI_MOD_MAGIC_AND_VERSION                       1   2048    4   1
+AD160.SHAPI_MOD_NEXT_MODULE_ADDRESS                     1   2052    4   1
+AD160.SHAPI_MOD_FIRMWARE_ID_AND_VENDOR                  1   2056    4   1
+AD160.SHAPI_MOD_FIRMWARE_VERSION                        1   2060    4   1
+AD160.SHAPI_MOD_FIRMWARE_NAME                           2   2064    8   1
+AD160.SHAPI_MOD_CAPABILITIES                            1   2072    4   1
+AD160.SHAPI_MOD_STATUS                                  1   2076    4   1
+AD160.SHAPI_MOD_CONTROL                                 1   2080    4   1
+AD160.SHAPI_MOD_INT_ID                                  1   2084    4   1
+AD160.SHAPI_MOD_INT_CLEAR                               1   2088    4   1
+AD160.SHAPI_MOD_INT_MASK                                1   2092    4   1
+AD160.SHAPI_MOD_INT_FLAG                                1   2096    4   1
+AD160.SHAPI_MOD_INT_ACTV                                1   2100    4   1
+AD160.WORD_ADC_OS                                       1   2104    4   1
 
-AD16.AREA_MULTIPLEXED_SEQUENCE_BUFFER_B     0x400000                0x10000000      0x1000000       0xD
-AD16.SEQUENCE_BUFFER_B_0                    0x1                     0x00            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_1                    0x1                     0x04            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_2                    0x1                     0x08            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_3                    0x1                     0x0C            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_4                    0x1                     0x10            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_5                    0x1                     0x14            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_6                    0x1                     0x18            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_7                    0x1                     0x1C            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_8                    0x1                     0x20            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_9                    0x1                     0x24            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_10                   0x1                     0x28            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_11                   0x1                     0x2C            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_12                   0x1                     0x30            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_13                   0x1                     0x34            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_14                   0x1                     0x38            0x4             0xD     18      0               1
-AD16.SEQUENCE_BUFFER_B_15                   0x1                     0x3C            0x4             0xD     18      0               1
+# reset the ADC if set to 1 for 1 second (and then back to 0)
+AD160.WORD_ADC_RESET                                    1   2108    4   1
+
+AD160.WORD_ADC_RANGE                                    1   2112    4   1
+
+# enable the ADC. Set to 1 at end of initialisation
+AD160.WORD_ADC_ENA                                      1   2116    4   1
+
+AD160.WORD_LED                                          1   2120    4   1
+
+BOARD0.WORD_FIRMWARE                                     1  0   4   0
+BOARD0.WORD_REVISION                                     1  4   4   0
+BOARD0.WORD_TIMESTAMP                                    1  8   4   0
+BOARD0.WORD_STATUS                                       1  28  4   0
+BOARD0.WORD_CLK_FREQ                                     7  32  28  0
+BOARD0.WORD_LLL_STATUS                                   12 192 48  0
+BOARD0.WORD_LLL_LOOPBACK                                 12 256 48  0
+BOARD0.WORD_BOOT_STATUS                                  1  384 4   0
+
+# Set to 0 at beginning of initialisation and wait for 0.1s, then set to 1 and wait for 0.1s after configuring the ADC and before resetting it via AD160.WORD_ADC_ENA
+BOARD0.WORD_RESET_N                                      1  512 4   0
+
+BOARD0.WORD_RESET_GTP                                    1  516 4   0
+BOARD0.WORD_USER                                         1  24  4   0
+BOARD0.WORD_RESET_S6                                     1  520 4   0
+BOARD0.BOARD_FMC25_S6                                    262144 1048576 1048576 0
+
+FMC25_S60.WORD_FIRMWARE                                     1   1048576 4   0
+FMC25_S60.WORD_REVISION                                     1   1048580 4   0
+FMC25_S60.WORD_TIMESTAMP                                    1   1048584 4   0
+FMC25_S60.WORD_CLK_FREQ                                     4   1048608 16  0
+FMC25_S60.WORD_SWX_LLL                                      4   1048640 16  0
+FMC25_S60.WORD_SWX_TCLK                                     4   1048672 16  0
+FMC25_S60.AREA_S6OSC                                        256 1049600 1024    0
+FMC25_S60.AREA_V5OSC                                        256 1050624 1024    0
+FMC25_S60.AREA_PLL_I2C                                      512 1052672 2048    0
+FMC25_S60.AREA_PLL_CONF                                     512 1054720 2048    0
+FMC25_S60.WORD_PLL_CONF_STR                                 1   1048848 4   0
+FMC25_S60.WORD_PLL_CONF_RST                                 1   1048852 4   0
+FMC25_S60.WORD_RESET_N                                      1   1049088 4   0
+FMC25_S60.WORD_USER                                         1   1049092 4   0
+FMC25_S60.WORD_LLL_STATUS                                   4   1049096 16  0
+
+# raw DMA area without multiplexing
+BOARD0.AREA_DMA       0x100000    0x00000000    0x400000    0x0000000D
+
+# Multiplexed DMA area for ADC data
+BOARD0.AREA_MULTIPLEXED_SEQUENCE_BUFFER     0x100000                0x0             0x400000        0xD
+BOARD0.SEQUENCE_BUFFER_0                    0x1                     0x00            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_1                    0x1                     0x04            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_2                    0x1                     0x08            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_3                    0x1                     0x0C            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_4                    0x1                     0x10            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_5                    0x1                     0x14            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_6                    0x1                     0x18            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_7                    0x1                     0x1C            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_8                    0x1                     0x20            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_9                    0x1                     0x24            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_10                   0x1                     0x28            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_11                   0x1                     0x2C            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_12                   0x1                     0x30            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_13                   0x1                     0x34            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_14                   0x1                     0x38            0x4             0xD     18      0               1
+BOARD0.SEQUENCE_BUFFER_15                   0x1                     0x3C            0x4             0xD     18      0               1
