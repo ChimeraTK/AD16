@@ -69,10 +69,10 @@ namespace mtca4u{
       buffer_name = "BUFFER_B";
     }
        */
-      std::string buffer_name = "BUFFER";
+      std::string buffer_name = "DAQ0_ADCA";
 
       // Obtain register description for buffer
-      _registerMapping->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_"+buffer_name, elem, "BOARD0");
+      _registerMapping->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_"+buffer_name, elem, "APP0");
 
       // total size of buffer to fill
       int32_t blockSize = elem.reg_size;

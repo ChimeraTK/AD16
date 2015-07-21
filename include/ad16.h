@@ -18,7 +18,7 @@ namespace mtca4u{
   class ad16 {
     public:
 
-      ad16() : _samplesPerBlock(65536), _mode(0), _lastBuffer(-1), max_elem_nr(0) {};
+      ad16() : _samplesPerBlock(1024), _mode(0), _lastBuffer(-1), max_elem_nr(0) {};
       ~ad16() {};
 
       /// Open AD16 device. Currently only a dummy device can be opened. The dummy device is selected by setting both arguments to the mapping file name.

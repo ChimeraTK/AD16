@@ -21,7 +21,7 @@ namespace mtca4u{
     // open map and store maximum number of elements
     _map = mapFileParser().parse(mappingFileName);
     mapFile::mapElem areaInfo;
-    _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_BUFFER",areaInfo,"BOARD0");
+    _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA",areaInfo,"APP0");
     max_elem_nr = areaInfo.reg_elem_nr;
 
     /* no double buffering supported by the current firmware...
@@ -156,18 +156,18 @@ namespace mtca4u{
       bufferName = "BUFFER_B";
     }
     */
-    std::string bufferName = "BUFFER";
+    std::string bufferName = "DAQ0_ADCA";
 
     // modify register map so the DMA area has the right length
     for(mapFile::iterator i = _map->begin(); i != _map->end(); ++i) {
-      if(i->reg_module == "BOARD0" && i->reg_name == "AREA_MULTIPLEXED_SEQUENCE_"+bufferName) {
+      if(i->reg_module == "APP0" && i->reg_name == "AREA_MULTIPLEXED_SEQUENCE_"+bufferName) {
         i->reg_elem_nr = numberOfChannels*_samplesPerBlock;
         i->reg_size = sizeof(int32_t)*i->reg_elem_nr;
       }
     }
 
     // create custom accessor
-    _dataDemuxed = _mappedDevice.getCustomAccessor< MultiplexedDataAccessor<int32_t> >(bufferName, "BOARD0");
+    _dataDemuxed = _mappedDevice.getCustomAccessor< MultiplexedDataAccessor<int32_t> >(bufferName, "APP0");
 
     // read data
     _dataDemuxed->read();

@@ -102,7 +102,7 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
   _dummyMapped.writeReg("WORD_TIMING_USER_TRG", "APP0", &val);
 
   // number of samples is currently fixed
-  int32_t nSamples = 65536;
+  int32_t nSamples = 1024;
 
   // wait until conversion is complete
   /* no synchronisation possible with current firmware...
@@ -115,7 +115,7 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
 
   // create accessor for multiplexed data
   boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed =
-      _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("BUFFER", "BOARD0");
+      _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
   dataDemuxed->read();
 
   // Return the number of sequences found: should be 16

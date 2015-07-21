@@ -85,20 +85,21 @@ FMC25_S60.WORD_LLL_STATUS                                   4   1049096 16  0
 BOARD0.AREA_DMA       0x100000    0x00000000    0x400000    0x0000000D
 
 # Multiplexed DMA area for ADC data
-BOARD0.AREA_MULTIPLEXED_SEQUENCE_BUFFER     0x100000                0x0             0x400000        0xD
-BOARD0.SEQUENCE_BUFFER_0                    0x1                     0x00            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_1                    0x1                     0x04            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_2                    0x1                     0x08            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_3                    0x1                     0x0C            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_4                    0x1                     0x10            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_5                    0x1                     0x14            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_6                    0x1                     0x18            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_7                    0x1                     0x1C            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_8                    0x1                     0x20            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_9                    0x1                     0x24            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_10                   0x1                     0x28            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_11                   0x1                     0x2C            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_12                   0x1                     0x30            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_13                   0x1                     0x34            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_14                   0x1                     0x38            0x4             0xD     18      0               1
-BOARD0.SEQUENCE_BUFFER_15                   0x1                     0x3C            0x4             0xD     18      0               1
+APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA                16384            0        65536     13     32      0    0
+APP0.SEQUENCE_DAQ0_ADCA_0                                   1            0            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_1                                   1            4            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_2                                   1            8            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_3                                   1           12            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_4                                   1           16            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_5                                   1           20            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_6                                   1           24            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_7                                   1           28            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_8                                   1           32            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_9                                   1           36            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_10                                  1           40            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_11                                  1           44            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_12                                  1           48            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_13                                  1           52            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_14                                  1           56            4     13     18      0    1
+APP0.SEQUENCE_DAQ0_ADCA_15                                  1           60            4     13     18      0    1
+
