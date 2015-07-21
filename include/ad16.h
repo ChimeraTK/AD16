@@ -6,6 +6,7 @@
 #include "ad16DummyDevice.h"
 #include "ad16Exception.h"
 #include <MtcaMappedDevice/devMap.h>
+#include <MtcaMappedDevice/devPCIE.h>
 
 namespace mtca4u{
 
@@ -18,7 +19,7 @@ namespace mtca4u{
   class ad16 {
     public:
 
-      ad16() : _samplesPerBlock(1024), _mode(0), _lastBuffer(-1), max_elem_nr(0) {};
+      ad16() : _samplesPerBlock(65536), _mode(0), _lastBuffer(-1), max_elem_nr(0) {};
       ~ad16() {};
 
       /// Open AD16 device. Currently only a dummy device can be opened. The dummy device is selected by setting both arguments to the mapping file name.
@@ -63,10 +64,13 @@ namespace mtca4u{
       boost::shared_ptr<mapFile> _map;
 
       /// our mapped device
-      devMap<devBase> _mappedDevice;
+      boost::shared_ptr< devMap<devBase> > _mappedDevice;
 
       /// pointer to dummy device (if used)
       boost::shared_ptr<ad16DummyDevice> _dummyDevice;
+
+      /// pointer to real device (if used)
+      boost::shared_ptr<devPCIE> _realDevice;
 
       /// accessor for multiplexed data
       boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > _dataDemuxed;

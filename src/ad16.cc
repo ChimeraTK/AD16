@@ -26,16 +26,24 @@ namespace mtca4u{
     // open dummy device
     if(deviceFileName == mappingFileName){
 
-      // creat the dummy device driver
+      // create the dummy device driver
       _dummyDevice = boost::shared_ptr<ad16DummyDevice>( new ad16DummyDevice );
       _dummyDevice->openDev(mappingFileName);
 
       // create mapped device
-      _mappedDevice.openDev( _dummyDevice, _map);
+      _mappedDevice = boost::shared_ptr< devMap<devBase> >( new devMap<devBase> );
+      _mappedDevice->openDev( _dummyDevice, _map);
     }
     // open real device
     else {
-      _mappedDevice.openDev(deviceFileName, mappingFileName);
+
+      // create the dummy device driver
+      _realDevice = boost::shared_ptr<devPCIE>( new devPCIE );
+      _realDevice->openDev(deviceFileName);
+
+      // create mapped device
+      _mappedDevice = boost::shared_ptr< devMap<devBase> >( new devMap<devBase> );
+      _mappedDevice->openDev( _realDevice, _map);
     }
 
     // Initialise device. Procedure taken from Matlab code "ad16_init.m" by Lukasz Butkowski
@@ -43,40 +51,40 @@ namespace mtca4u{
 
     // send reset
     val = 0;
-    _mappedDevice.writeReg("WORD_ADC_ENA","AD160",&val);
+    _mappedDevice->writeReg("WORD_ADC_ENA","AD160",&val);
     val = 0;
-    _mappedDevice.writeReg("WORD_RESET_N","BOARD0",&val);
+    _mappedDevice->writeReg("WORD_RESET_N","BOARD0",&val);
     usleep(100000); // 0.1 seconds
 
     // set trigger to user trigger
     val = 8;
-    _mappedDevice.writeReg("WORD_TIMING_TRG_SEL","APP0",&val);
+    _mappedDevice->writeReg("WORD_TIMING_TRG_SEL","APP0",&val);
 
     // enable data taking
     val = 1;
-    _mappedDevice.writeReg("WORD_DAQ_ENABLE","APP0",&val);
+    _mappedDevice->writeReg("WORD_DAQ_ENABLE","APP0",&val);
 
     // complete initialisation
     val = 1;
-    _mappedDevice.writeReg("WORD_RESET_N","BOARD0",&val);
+    _mappedDevice->writeReg("WORD_RESET_N","BOARD0",&val);
     usleep(100000); // 0.1 seconds
 
     val = 1;
-    _mappedDevice.writeReg("WORD_ADC_RESET","AD160",&val);
+    _mappedDevice->writeReg("WORD_ADC_RESET","AD160",&val);
     usleep(1000000); // 1 seconds
 
     val = 0;
-    _mappedDevice.writeReg("WORD_ADC_RESET","AD160",&val);
+    _mappedDevice->writeReg("WORD_ADC_RESET","AD160",&val);
     usleep(1000000); // 1 seconds
 
     val = 1;
-    _mappedDevice.writeReg("WORD_ADC_ENA","AD160",&val);
+    _mappedDevice->writeReg("WORD_ADC_ENA","AD160",&val);
 
   }
 
   /*************************************************************************************************/
   void ad16::close() {
-    _mappedDevice.closeDev();
+    _mappedDevice->closeDev();
     _dummyDevice->closeDev();
   }
 
@@ -113,7 +121,7 @@ namespace mtca4u{
 
     // write to trigger register
     int32_t val = 1;
-    _mappedDevice.writeReg("WORD_TIMING_USER_TRG", "APP0", &val);
+    _mappedDevice->writeReg("WORD_TIMING_USER_TRG", "APP0", &val);
   }
 
   /*************************************************************************************************/
@@ -170,7 +178,7 @@ namespace mtca4u{
     }
 
     // create custom accessor
-    _dataDemuxed = _mappedDevice.getCustomAccessor< MultiplexedDataAccessor<int32_t> >(bufferName, "APP0");
+    _dataDemuxed = _mappedDevice->getCustomAccessor< MultiplexedDataAccessor<int32_t> >(bufferName, "APP0");
 
     // read data
     _dataDemuxed->read();
