@@ -9,15 +9,6 @@ namespace mtca4u{
   /*************************************************************************************************/
   void ad16::open(const std::string &deviceFileName, const std::string &mappingFileName) {
 
-    // currently only dummy device allowed
-    if(deviceFileName != mappingFileName){
-      throw ad16Exception("Real devices currently not supported",ad16Exception::ILLEGAL_PARAMETER);
-    }
-
-    // open dummy device
-    _dummyDevice = boost::shared_ptr<ad16DummyDevice>( new ad16DummyDevice );
-    _dummyDevice->openDev(mappingFileName);
-
     // open map and store maximum number of elements
     _map = mapFileParser().parse(mappingFileName);
     mapFile::mapElem areaInfo;
@@ -32,8 +23,20 @@ namespace mtca4u{
     }
     */
 
-    // create mapped device
-    _mappedDevice.openDev( _dummyDevice, _map);
+    // open dummy device
+    if(deviceFileName == mappingFileName){
+
+      // creat the dummy device driver
+      _dummyDevice = boost::shared_ptr<ad16DummyDevice>( new ad16DummyDevice );
+      _dummyDevice->openDev(mappingFileName);
+
+      // create mapped device
+      _mappedDevice.openDev( _dummyDevice, _map);
+    }
+    // open real device
+    else {
+      _mappedDevice.openDev(deviceFileName, mappingFileName);
+    }
 
     // Initialise device. Procedure taken from Matlab code "ad16_init.m" by Lukasz Butkowski
     int32_t val;

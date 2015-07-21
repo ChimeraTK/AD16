@@ -85,7 +85,7 @@ FMC25_S60.WORD_LLL_STATUS                                   4   1049096 16  0
 BOARD0.AREA_DMA       0x100000    0x00000000    0x400000    0x0000000D
 
 # Multiplexed DMA area for ADC data
-APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA                16384            0        65536     13     32      0    0
+APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA             0x100000            0     0x400000     13     32      0    0
 APP0.SEQUENCE_DAQ0_ADCA_0                                   1            0            4     13     18      0    1
 APP0.SEQUENCE_DAQ0_ADCA_1                                   1            4            4     13     18      0    1
 APP0.SEQUENCE_DAQ0_ADCA_2                                   1            8            4     13     18      0    1
