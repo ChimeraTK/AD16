@@ -2,6 +2,9 @@
 #include <MtcaMappedDevice/DummyDevice.h>
 #include <MtcaMappedDevice/mapFileParser.h>
 #include <MtcaMappedDevice/mapFile.h>
+#include <mtca4uPy/HelperFunctions.h>
+#include <mtca4uPy/PythonExceptions.h>
+#include <cstring>
 
 namespace mtca4u{
   const int32_t ad16::numberOfChannels = 16;
@@ -57,7 +60,7 @@ namespace mtca4u{
     usleep(100000); // 0.1 seconds
 
     // set trigger to user trigger
-    val = 8;
+    val = SOFTWARE_TRIGGER;
     _mappedDevice->writeReg("WORD_TIMING_TRG_SEL","APP0",&val);
 
     // enable data taking
@@ -194,6 +197,20 @@ namespace mtca4u{
 
     // return demultiplexed data
     return (*_dataDemuxed)[channel];
+
+  }
+
+  /*************************************************************************************************/
+  void ad16::getChannelDataNumpy(unsigned int channel, boost::python::numeric::array &numpyArray) {
+    if(mtca4upy::extractDataType(numpyArray) == mtca4upy::INT32) {
+      int* dataLocation =
+          reinterpret_cast<int*>(mtca4upy::extractDataPointer(numpyArray));
+
+      memcpy( dataLocation, (*_dataDemuxed)[channel].data(), (*_dataDemuxed)[channel].size() * sizeof(int));
+
+    } else {
+      throw mtca4upy::ArrayElementTypeNotSupported();
+    }
 
   }
 

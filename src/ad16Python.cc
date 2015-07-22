@@ -10,8 +10,8 @@ using namespace boost::python;
 BOOST_PYTHON_MODULE(libad16)
 {
 
-  class_< std::vector<int> >("VectorInt")
-     .def(vector_indexing_suite< std::vector<int> >() );
+  //class_< std::vector<int> >("VectorInt")
+     //.def(vector_indexing_suite< std::vector<int> >() );
 
   class_<ad16, boost::noncopyable>("ad16")
     .def("open",&ad16::open)
@@ -22,7 +22,7 @@ BOOST_PYTHON_MODULE(libad16)
     .def("setSamplingRate",&ad16::setSamplingRate)
     .def("setSamplesPerBlock",&ad16::setSamplesPerBlock)
     .def("read",&ad16::read)
-    .def("getChannelData",&ad16::getChannelData)
+    .def("getChannelData",&ad16::getChannelDataNumpy)
     ;
 
   enum_<ad16::rate>("rate")
@@ -39,4 +39,6 @@ BOOST_PYTHON_MODULE(libad16)
     //.value("EXT_TRIGGER_DOUBLE_BUFFER", ad16::EXT_TRIGGER_DOUBLE_BUFFER)
     .value("AUTO_TRIGGER", ad16::AUTO_TRIGGER)
   ;
+
+  numeric::array::set_module_and_type("numpy", "ndarray");
 }

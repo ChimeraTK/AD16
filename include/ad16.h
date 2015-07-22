@@ -7,6 +7,7 @@
 #include "ad16Exception.h"
 #include <MtcaMappedDevice/devMap.h>
 #include <MtcaMappedDevice/devPCIE.h>
+#include <boost/python.hpp>
 
 namespace mtca4u{
 
@@ -54,6 +55,9 @@ namespace mtca4u{
 
       /// Get data for single channel after a previous read()
       std::vector<int> getChannelData(unsigned int channel);
+
+      /// Get data for single channel after a previous read(). Version for Python with numpy array
+      void getChannelDataNumpy(unsigned int channel, boost::python::numeric::array &numpyArray);
 
       /// number of channels (constant)
       const static int32_t numberOfChannels;
