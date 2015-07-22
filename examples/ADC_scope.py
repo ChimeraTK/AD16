@@ -45,10 +45,10 @@ class MainWindow(QtGui.QMainWindow):
             myplot = self.plot.plot()
             myplot.setPen(pg.mkPen(pg.intColor(i)))
             self.curve.append(myplot)
-        self.plot.setRange(QtCore.QRectF(0, -2**17, 1./79.*NUMBER_OF_SAMPLES, 2**18))
+        self.plot.setRange(QtCore.QRectF(0, -2**17, 1./79.1*NUMBER_OF_SAMPLES, 2**18))
         self.plot.setLabel('bottom','Time [ms]')
         self.plot.setLabel('left','ADC value')
-        self.grid.addWidget(self.plot,1,0,1,33)
+        self.grid.addWidget(self.plot,1,0,1,35)
 
         self.plot2 = pg.PlotWidget()
         self.curve2 = []
@@ -57,10 +57,10 @@ class MainWindow(QtGui.QMainWindow):
             myplot.setPen(pg.mkPen(pg.intColor(i)))
             self.curve2.append(myplot)
         self.plot2.setLogMode(0,1)
-        #self.plot2.setRange(QtCore.QRectF(0, 0.0000000001, 79./2., 1.0))
+        #self.plot2.setRange(QtCore.QRectF(0, 0.0000000001, 79.1/2., 1.0))
         self.plot2.setLabel('bottom','Frequency [kHz]')
         self.plot2.setLabel('left','Power Spectrum Density')
-        self.grid.addWidget(self.plot2,2,0,1,33)
+        self.grid.addWidget(self.plot2,2,0,1,35)
         
         self.text1 = QtGui.QLabel('Sampling rate:')
         self.grid.addWidget(self.text1,3,0)
@@ -70,7 +70,7 @@ class MainWindow(QtGui.QMainWindow):
         #self.samplingRate.addItem("10 kHz", libad16.rate.Hz10000)
         #self.samplingRate.addItem("5 kHz", libad16.rate.Hz5000)
         #self.samplingRate.addItem("1 kHz", libad16.rate.Hz1000)
-        self.samplingRate.addItem("79 kHz", libad16.rate.Hz100000)
+        self.samplingRate.addItem("79.1 kHz", libad16.rate.Hz100000)
         self.grid.addWidget(self.samplingRate,3,1,1,3)
         
         self.text2 = QtGui.QLabel('Number of samples per channel:')
@@ -81,7 +81,7 @@ class MainWindow(QtGui.QMainWindow):
         self.grid.addWidget(self.samples,4,1,1,3)
         
         self.startStopButton = QtGui.QPushButton('Start')
-        self.grid.addWidget(self.startStopButton,3,29,1,4)
+        self.grid.addWidget(self.startStopButton,3,32,1,3)
         self.DAQrunning = 0
         self.startStopButton.clicked.connect(self.clickStartStop)
         
@@ -103,6 +103,10 @@ class MainWindow(QtGui.QMainWindow):
             
             self.grid.addWidget(self.chnlabel[i],5,2+2*i)
         
+        self.toggleChannelsButton = QtGui.QPushButton('toggle all')
+        self.grid.addWidget(self.toggleChannelsButton,5,34)
+        self.toggleChannelsButton.clicked.connect(self.clickToggleChannels)
+        
         self.text4 = QtGui.QLabel('FFT:')
         self.grid.addWidget(self.text4,6,0)
         self.fft = []
@@ -119,6 +123,10 @@ class MainWindow(QtGui.QMainWindow):
             self.fftlabel[i].setPalette(pal)
             
             self.grid.addWidget(self.fftlabel[i],6,2+2*i)
+
+        self.toggleFFTsButton = QtGui.QPushButton('toggle all')
+        self.grid.addWidget(self.toggleFFTsButton,6,34)
+        self.toggleFFTsButton.clicked.connect(self.clickToggleFFTs)
 
         self.widget = QtGui.QWidget();
         self.widget.setLayout(self.grid);
@@ -159,6 +167,14 @@ class MainWindow(QtGui.QMainWindow):
             self.startStopButton.setText('Start')
             self.DAQrunning = 0
     
+    def clickToggleChannels(self):
+        for i in range(0,NUMBER_OF_CHANNELS):
+            self.chn[i].toggle()
+
+    def clickToggleFFTs(self):
+        for i in range(0,NUMBER_OF_CHANNELS):
+            self.fft[i].toggle()
+
     def makeMenu(self):
         self._saveAction = QtGui.QAction("&Save current data...", None)
         self.connect(self._saveAction, QtCore.SIGNAL('triggered()'), self.slotSave)
@@ -197,7 +213,7 @@ class MainWindow(QtGui.QMainWindow):
             # file name must be converted into standard python string
             name = str(dlg.selectedFiles()[0])
             # save in coma separated values format. The array is transposed so we have the samples in rows and the channels in columns
-            np.savetxt(name, np.transpose(self.signal), '%.18e', ',', '\n')
+            np.savetxt(name, np.transpose(self.signal), '%d', ',', '\n')
             # show message of success
             QtGui.QMessageBox.information(self, 'Data saved', 'Current data has been saved to file "'+name+'".')
 
@@ -233,7 +249,7 @@ class MainWindow(QtGui.QMainWindow):
             self.ad16.getChannelData(i, self.signal[i])
 
         # compute x-axis values
-        time_step = 1./79.
+        time_step = 1./79.1
         times = np.linspace(0., time_step*NUMBER_OF_SAMPLES, NUMBER_OF_SAMPLES, 0)
         
         # trigger next conversion
