@@ -1,32 +1,33 @@
 #!/usr/bin/env python
 '''
-Simple QT gui for ploting ADC data
-Currently, just dummy data is used ...
+AD16 scope application with FFT
 
+Authors:
 cezary.sydlo@desy.de
-
-Changed to use AD16 library by martin.hierholzer@desy.de
+martin.hierholzer@desy.de
 '''
 
+# system libraries and numpy
 import sys
 import time
-from PyQt4.QtGui import QFileDialog
-from PyQt4.Qt import QMessageBox
-
-NUMBER_OF_CHANNELS = 16
-# the number of samples (per channel) is currently fixed, this is a firmware limitation and will change in future
-NUMBER_OF_SAMPLES = 65536
+import datetime
+import numpy as np
 
 # GUI is QT
+from PyQt4.QtGui import QFileDialog
+from PyQt4.Qt import QMessageBox
 from pyqtgraph.Qt import QtCore, QtGui
 
 # plotting is done with PyQtGraph
 import pyqtgraph as pg
 
-# a bit of calculation
-import numpy as np
-
+# ad16 library
 import libad16
+
+# some constants: number of channels is fixed in hardware
+NUMBER_OF_CHANNELS = 16
+# the number of samples (per channel) is currently fixed, this is a firmware limitation and will change in future
+NUMBER_OF_SAMPLES = 65536
 
 class MainWindow(QtGui.QMainWindow):
 
@@ -92,7 +93,7 @@ class MainWindow(QtGui.QMainWindow):
         self.chnlabel = []
         for i in range(0,NUMBER_OF_CHANNELS):
             self.chn.append(QtGui.QCheckBox())
-            if i == 1:
+            if i == 0:
                 self.chn[i].setChecked(1)
             self.grid.addWidget(self.chn[i],5,1+2*i)
             self.chnlabel.append(QtGui.QLabel(str(i)))
@@ -113,7 +114,7 @@ class MainWindow(QtGui.QMainWindow):
         self.fftlabel = []
         for i in range(0,NUMBER_OF_CHANNELS):
             self.fft.append(QtGui.QCheckBox())
-            if i == 1:
+            if i == 0:
                 self.fft[i].setChecked(1)
             self.grid.addWidget(self.fft[i],6,1+2*i)
             self.fftlabel.append(QtGui.QLabel(str(i)))
@@ -212,8 +213,29 @@ class MainWindow(QtGui.QMainWindow):
         if dlg.exec_() :
             # file name must be converted into standard python string
             name = str(dlg.selectedFiles()[0])
-            # save in coma separated values format. The array is transposed so we have the samples in rows and the channels in columns
-            np.savetxt(name, np.transpose(self.signal), '%d', ',', '\n')
+            # open output file and write header (savetxt does not support headers in older versions)
+            f = open(name,'w')
+            f.write('# AD16 data dump\n')
+            f.write('# Sample frequency:              79.1 kHz\n')
+            f.write('# Number of channels:            16\n')
+            f.write('# Number of samples per channel: 65536\n')
+            f.write('# File created on:               '+datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
+            f.write('# Time [ms]')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                f.write(',      {0:2d}'.format(i))
+            f.write('\n')
+            # prepare array to be saved: transpose (to have samples in rows) and add time column
+            savedata = self.signal.astype(np.float32)
+            savedata = np.transpose(savedata)
+            savedata = np.insert(savedata, 0, self.times, axis=1)
+            # write data in coma separated values format
+            fmt = []
+            fmt.append('%11.3f')
+            for i in range(1,NUMBER_OF_CHANNELS+1):
+                fmt.append(' %7d')
+            np.savetxt(f, savedata, fmt, ',', '\n')
+            # close file
+            f.close()
             # show message of success
             QtGui.QMessageBox.information(self, 'Data saved', 'Current data has been saved to file "'+name+'".')
 
@@ -250,7 +272,7 @@ class MainWindow(QtGui.QMainWindow):
 
         # compute x-axis values
         time_step = 1./79.1
-        times = np.linspace(0., time_step*NUMBER_OF_SAMPLES, NUMBER_OF_SAMPLES, 0)
+        self.times = np.linspace(0., time_step*float(NUMBER_OF_SAMPLES), num=NUMBER_OF_SAMPLES, endpoint=False)
         
         # trigger next conversion
         self.ad16.startConversion()
@@ -274,7 +296,7 @@ class MainWindow(QtGui.QMainWindow):
         # plot the signal
         for i in range(0,NUMBER_OF_CHANNELS):
             if self.chn[i].isChecked():
-                self.curve[i].setData(times,self.signal[i])
+                self.curve[i].setData(self.times,self.signal[i])
             else:
                 self.curve[i].clear()
         
