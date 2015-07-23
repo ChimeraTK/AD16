@@ -284,8 +284,8 @@ class MainWindow(QtGui.QMainWindow):
         powerspectrum = np.zeros( (NUMBER_OF_CHANNELS,NUMBER_OF_SAMPLES), dtype=np.float64)
         for i in range(0,NUMBER_OF_CHANNELS):
             if self.fft[i].isChecked():
-                powerspectrum[i] = np.abs(np.fft.fft(self.signal[i]))**2
-                powerspectrum[i] = powerspectrum[i]/np.linalg.norm(powerspectrum[i])
+                powerspectrum[i] = np.abs(np.fft.fft(self.signal[i]))**2 / NUMBER_OF_SAMPLES 
+                #powerspectrum[i] = powerspectrum[i]/np.linalg.norm(powerspectrum[i]) * np.linalg.norm(np.abs(self.signal[i])**2)
         
         freqs = np.fft.fftfreq(self.signal[0].size, time_step)
         idx   = np.argsort(freqs)
