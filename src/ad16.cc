@@ -12,6 +12,9 @@ namespace mtca4u{
   /*************************************************************************************************/
   void ad16::open(const std::string &deviceFileName, const std::string &mappingFileName) {
 
+    // check if already opened
+    if(_isOpen) throw ad16Exception("Device already opened.",ad16Exception::ALREADY_OPENED);
+
     // open map and store maximum number of elements
     _map = mapFileParser().parse(mappingFileName);
     mapFile::mapElem areaInfo;
@@ -83,16 +86,22 @@ namespace mtca4u{
     val = 1;
     _mappedDevice->writeReg("WORD_ADC_ENA","AD160",&val);
 
+    // set open flag
+    _isOpen = true;
+
   }
 
   /*************************************************************************************************/
   void ad16::close() {
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
     _mappedDevice->closeDev();
-    _dummyDevice->closeDev();
+    _isOpen = false;
   }
 
   /*************************************************************************************************/
   void ad16::setMode(int mode) {
+    (void)mode;
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
     throw ad16Exception("Trigger mode cannot be changed currently",ad16Exception::NOT_IMPLEMENTED);
     //_mode = mode;
     //_mappedDevice.writeReg("MODE", "AD16", &mode);
@@ -100,12 +109,16 @@ namespace mtca4u{
 
   /*************************************************************************************************/
   void ad16::setSamplingRate(int divisor) {
+    (void)divisor;
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
     throw ad16Exception("Sample rate cannot be changed in current firmware",ad16Exception::NOT_IMPLEMENTED);
     //_mappedDevice.writeReg("SAMPLING_RATE_DIV", "AD16", &divisor);
   }
 
   /*************************************************************************************************/
   void ad16::setSamplesPerBlock(int samples) {
+    (void)samples;
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
     throw ad16Exception("Samples per block cannot be changed in current firmware",ad16Exception::NOT_IMPLEMENTED);
     //_samplesPerBlock = samples;
     //_mappedDevice.writeReg("SAMPLES_PER_BLOCK", "AD16", &samples);
@@ -113,6 +126,9 @@ namespace mtca4u{
 
   /*************************************************************************************************/
   void ad16::startConversion() {
+
+    // check if opened
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
 
     // check if conversion is already running
     if(!conversionComplete()) {
@@ -129,6 +145,9 @@ namespace mtca4u{
 
   /*************************************************************************************************/
   bool ad16::conversionComplete() {
+
+    // check if opened
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
 
     /* currently not implemented in firmware
     if(_mode == 0 || _mode == 1) {
@@ -153,6 +172,9 @@ namespace mtca4u{
 
   /*************************************************************************************************/
   void ad16::read() {
+
+    // check if opened
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
 
     // check if conversion is still running
     if(!conversionComplete()) {
@@ -190,8 +212,11 @@ namespace mtca4u{
   /*************************************************************************************************/
   std::vector<int> ad16::getChannelData(unsigned int channel) {
 
+    // check if opened
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
+
     // check if channel is in range
-    if(channel > _dataDemuxed->getNumberOfDataSequences()) {
+    if(channel >= _dataDemuxed->getNumberOfDataSequences()) {
       throw ad16Exception("Channel number out of range",ad16Exception::CHANNEL_OUT_OF_RANGE);
     }
 
@@ -202,13 +227,18 @@ namespace mtca4u{
 
   /*************************************************************************************************/
   void ad16::getChannelDataNumpy(unsigned int channel, boost::python::numeric::array &numpyArray) {
-    if(mtca4upy::extractDataType(numpyArray) == mtca4upy::INT32) {
-      int* dataLocation =
-          reinterpret_cast<int*>(mtca4upy::extractDataPointer(numpyArray));
 
+    // check if opened
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
+
+    // check for correct data type
+    if(mtca4upy::extractDataType(numpyArray) == mtca4upy::INT32) {
+      // copy data to python array
+      int* dataLocation = reinterpret_cast<int*>(mtca4upy::extractDataPointer(numpyArray));
       memcpy( dataLocation, (*_dataDemuxed)[channel].data(), (*_dataDemuxed)[channel].size() * sizeof(int));
 
-    } else {
+    }
+    else {
       throw mtca4upy::ArrayElementTypeNotSupported();
     }
 

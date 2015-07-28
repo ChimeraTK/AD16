@@ -34,9 +34,10 @@ class DummyDeviceTest {
       _dummyDevice = boost::shared_ptr<TestableDummyDevice>( new TestableDummyDevice() );
     }
 
+    void testExceptions();
     void testSoftwareTriggeredMode();
-    void testSampleRate();
-    void testAutoTriggerMode();
+    //void testSampleRate();
+    //void testAutoTriggerMode();
 
   private:
     //TestableDummyDevice _dummyDevice;
@@ -49,7 +50,7 @@ class DummyDeviceTest {
     // nSamples and fDiv are the number of samples and the sample rate divisor
     // msOffset is the calibration offset to be subtracted from the measured time. -1 will disable comparing the time
     // to the expectation (used to measure the offset)
-    int measureConversionTime(int nSamples, int fDiv, int msOffset=-1);
+    //int measureConversionTime(int nSamples, int fDiv, int msOffset=-1);
 
 };
 
@@ -59,6 +60,7 @@ class  DummyDeviceTestSuite : public test_suite {
     DummyDeviceTestSuite() : test_suite("DummyDevice test suite") {
       boost::shared_ptr<DummyDeviceTest> dummyDeviceTest( new DummyDeviceTest );
 
+      add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testExceptions, dummyDeviceTest ) );
       add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testSoftwareTriggeredMode, dummyDeviceTest ) );
       //add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testSampleRate, dummyDeviceTest ) );
     }};
@@ -82,10 +84,34 @@ void DummyDeviceTest::freshlyOpenDevice() {
     // make sure the device was freshly opened, so
     // registers are set to 0.
     _dummyMapped.closeDev();
-    //_dummyDevice->closeDev();
     _dummyDevice->openDev(TEST_MAPPING_FILE);
     _dummyMapped.openDev( _dummyDevice, _dummyDevice->_registerMapping);
   }
+}
+
+/**********************************************************************************************************************/
+void DummyDeviceTest::testExceptions() {
+  // close the not opened device
+  BOOST_CHECK_THROW( _dummyDevice->closeDev(), DummyDeviceException);
+  try {
+    _dummyDevice->closeDev();
+  }
+  catch(DummyDeviceException &a) {
+    BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_CLOSED);
+  }
+
+  // open twice
+  _dummyDevice->openDev(TEST_MAPPING_FILE);
+  BOOST_CHECK_THROW( _dummyDevice->openDev(TEST_MAPPING_FILE), DummyDeviceException);
+  try {
+    _dummyDevice->openDev(TEST_MAPPING_FILE);
+  }
+  catch(DummyDeviceException &a) {
+    BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_OPEN);
+  }
+
+  // close again
+  _dummyDevice->closeDev();
 }
 
 /**********************************************************************************************************************/
@@ -138,6 +164,7 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
 }
 
 /**********************************************************************************************************************/
+/*
 void DummyDeviceTest::testSampleRate() {
   int32_t val;
   freshlyOpenDevice();
@@ -155,10 +182,10 @@ void DummyDeviceTest::testSampleRate() {
   measureConversionTime(1000,5,msOffset);
   measureConversionTime(1000,100,msOffset);
 }
-
+*/
 /**********************************************************************************************************************/
+/*
 int DummyDeviceTest::measureConversionTime(int nSamples, int fDiv, int msOffset) {
-
   // set number of samples per block and channel
   _dummyMapped.writeReg("SAMPLES_PER_BLOCK", "AD16", &nSamples);
 
@@ -197,8 +224,9 @@ int DummyDeviceTest::measureConversionTime(int nSamples, int fDiv, int msOffset)
   return ms;
 
 }
-
+*/
 /**********************************************************************************************************************/
+/*
 void DummyDeviceTest::testAutoTriggerMode() {
   int32_t val;
   freshlyOpenDevice();
@@ -245,3 +273,4 @@ void DummyDeviceTest::testAutoTriggerMode() {
   }
   BOOST_CHECK( (*dataDemuxed)[0][nSamples] == 0 );
 }
+*/

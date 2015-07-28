@@ -2,7 +2,7 @@
 #include <boost/bind.hpp>
 #include <boost/random/uniform_int.hpp>
 
-namespace mtca4u{
+namespace mtca4u {
   const int32_t ad16DummyDevice::numberOfChannels = 16;
 
   // on device open: register callback functions
@@ -23,6 +23,23 @@ namespace mtca4u{
 
     _registerMapping->getRegisterInfo("SAMPLES_PER_BLOCK", elem, "AD16");
     writeReg(elem.reg_address, 1024, elem.reg_bar);*/
+
+    isOpened = true;
+  }
+
+  // close device: clean up
+  void ad16DummyDevice::closeDev() {
+
+    // interrupt conversion thread
+    if(isOpened) {
+      theThread.interrupt();
+      theThread.join();
+    }
+
+    // call parent class close device to clean up
+    DummyDevice::closeDev();
+
+    isOpened = false;
   }
 
   // callback for control register writes
@@ -75,7 +92,7 @@ namespace mtca4u{
       _registerMapping->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_"+buffer_name, elem, "APP0");
 
       // total size of buffer to fill
-      int32_t blockSize = elem.reg_size;
+      //int32_t blockSize = elem.reg_size;
 
       // compute number of samples
       int32_t nSamples = elem.reg_elem_nr/numberOfChannels;
@@ -108,6 +125,11 @@ namespace mtca4u{
           if(i == 0) {
             data = iSample;
           }
+          else if(i == 1) {
+            data = 1000.*sin(2.*acos(-1) * (float)iSample/(float)nSamples*1000) +
+                1000.*sin(2.*acos(-1) * (float)iSample/(float)nSamples* 100) +
+                100.*sin(2.*acos(-1) * (float)iSample/(float)nSamples* 500);
+          }
           else {
             data = uniform(rng);
           }
@@ -119,11 +141,10 @@ namespace mtca4u{
       }
 
       // wait some time to simulate conversion timing
-      int32_t uSecsPerSample = 1. / 79000. * 1e6;         // sample rate fixed at ~79kHz
+      int32_t uSecsTotal = nSamples * (1. / 79100. * 1e6);         // sample rate fixed at ~79.1kHz
       boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
-      boost::posix_time::time_duration dt = t1-t0;
-      int32_t uSecsToSleep = uSecsPerSample * nSamples - dt.total_microseconds();
-      usleep(uSecsToSleep);
+      boost::posix_time::time_duration dt = boost::posix_time::microseconds(uSecsTotal) - (t1-t0);
+      boost::this_thread::sleep(dt);
 
       isConversionRunning = false;
 
@@ -162,7 +183,7 @@ namespace mtca4u{
       // sleep
       std::cout << "Wait for next autotrigger..." << std::endl;
       usleep(us_needed - us_taken);
-      */
+       */
       return;
 
     }

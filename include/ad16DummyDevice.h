@@ -18,12 +18,17 @@ namespace mtca4u{
   {
     public:
 
-      ad16DummyDevice() : isConversionRunning(false),currentPosition(0) {}
+      ad16DummyDevice() : isOpened(false),isConversionRunning(false),currentPosition(0) {}
       virtual ~ad16DummyDevice() {}
 
-      virtual void openDev (const std::string &mappingFileName, int perm=O_RDWR, devConfigBase *pConfig=NULL);
+      virtual void openDev(const std::string &mappingFileName, int perm=O_RDWR, devConfigBase *pConfig=NULL);
+
+      virtual void closeDev();
 
     protected:
+
+      /// flag if the device is currently open or not
+      bool isOpened;
 
       /// callback writing to the START_CONVERSION register
       void callbackStartConversion();
