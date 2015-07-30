@@ -140,11 +140,14 @@ class MainWindow(QtGui.QMainWindow):
         self.resetMeasurementsButton.clicked.connect(self.resetMeasurements)
 
         self.measurementsSelection = QtGui.QComboBox()
-        self.measurementsSelection.addItem("Power Spectrum", 1)
-        self.measurementsSelection.addItem("Amplitude Spectrum", 2)
-        self.measurementsSelection.addItem("Crosstalk", 3)
-        self.measurementsSelection.addItem("Frequency Response", 4)
-        self.measurementsSelection.addItem("Amplitude over Time", 5)
+        self.measurementsSelection.addItem("Power Spectrum")
+        self.measurementsSelection.addItem("Amplitude Spectrum")
+        self.measurementsSelection.addItem("Crosstalk")
+        self.measurementsSelection.addItem("Frequency Response")
+        self.measurementsSelection.addItem("Amplitude over Frequency")
+        self.measurementsSelection.addItem("Amplitude over Time")
+        self.measurementsSelection.addItem("RMS over Frequency")
+        self.measurementsSelection.addItem("Mean over Frequency")
         self.grid.addWidget(self.measurementsSelection,7,5,1,3)
         self.connect(self.measurementsSelection, QtCore.SIGNAL('activated(QString)'), self.updateLowerPlot)
 
@@ -289,12 +292,17 @@ class MainWindow(QtGui.QMainWindow):
         self.frequencyResponseCounter = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.int32)
         self.amplitudeVsTime = np.zeros( NUMBER_OF_TIME_SLICES, dtype=np.float64)  # x-axis in 1/10 seconds
         self.amplitudeVsTimeCounter = np.zeros( NUMBER_OF_TIME_SLICES, dtype=np.int32)
+        self.rmsVsFrequency = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.float64)
+        self.meanVsFrequency = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.float64)
+        self.rmsVsFrequencyCounter = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.int32)
         self.sweepCounter = 0
         self.sweepStart = time.time()
         self.lastFrequency = -999
         self.signalChannel = -1
         for k in range(0,NUMBER_OF_SAMPLES/2):
             self.frequencyResponse[k] = np.NaN
+            self.rmsVsFrequency[k] = np.NaN
+            self.meanVsFrequency[k] = np.NaN
             for i in range(0,NUMBER_OF_CHANNELS):
                 self.ratio[i][k] = np.NaN
         for k in range(0,NUMBER_OF_TIME_SLICES):
@@ -370,10 +378,13 @@ class MainWindow(QtGui.QMainWindow):
         time_plot_image = time.time()
         
         # What the hell is going on ... put info into statusbar
+        f = self.freqs[self.lastFrequency]
         if self.signalChannel == -1:
             signalChannelText = '(not yet determined)'
+            f = np.NaN
         elif self.signalChannel == -2:
             signalChannelText = '*** CHANGED DURING MEASUREMENT ***'
+            f = np.NaN
         else:
             signalChannelText = str(self.signalChannel)
         self.statusBar.showMessage(
@@ -382,14 +393,14 @@ class MainWindow(QtGui.QMainWindow):
         \tAcq: %.3fms\
         \tCalc: %.3fms\
         \tPlot: %.3fms\
+        \tSignal Channel: %s\
         \tFrequency: %.3f kHz\
-        \tSweeps: %d\
-        \tSignal Channel: %s'
+        \tSweeps: %d'
             %(self.counter, fps,
             1000 * (time_get_image - self.start_time),
             1000 * (time_calc_image - time_get_image),
             1000 * (time_plot_image - time_calc_image),
-            self.freqs[self.lastFrequency], self.sweepCounter, signalChannelText))
+             signalChannelText, f, self.sweepCounter))
 
         # update sample rate and number of samples
         #val = self.samplingRate.itemData(self.samplingRate.currentIndex()).toPyObject()
@@ -420,18 +431,21 @@ class MainWindow(QtGui.QMainWindow):
         # measure cross talk:
         # first channel with maximum signal power, since this will be the reference
         theSignalChannel = -1.
-        theSignalMaximum = -1.
+        theSignalPower = -1.
+        theSignalFrequency = 0
         for i in range(0,NUMBER_OF_CHANNELS):
-            theChannelMaximum = np.amax(self.powerspectrum[i])
-            if(theChannelMaximum > theSignalMaximum):
-                theSignalMaximum = theChannelMaximum
+            chnSignalFrequency = np.argmax(self.powerspectrum[i][20:NUMBER_OF_SAMPLES/2-20])+20
+            chnSignalPower = self.getFFTpower(chnSignalFrequency,self.powerspectrum[i])
+            if(chnSignalPower > theSignalPower):
+                theSignalPower = chnSignalPower
                 theSignalChannel = i
+                theSignalFrequency = chnSignalFrequency
         
         # determine frequency of input signal (maximuim of fft)
-        theSignalFrequency = np.abs(self.idx[np.argmax(self.powerspectrum[theSignalChannel])] - NUMBER_OF_SAMPLES/2)
+        #theSignalFrequency = np.abs(self.idx[np.argmax(self.powerspectrum[theSignalChannel])] - NUMBER_OF_SAMPLES/2)
         
         # determine power of input signal (integrated FFT around peak)
-        theSignalPower = self.getFFTpower(theSignalFrequency,self.powerspectrum[theSignalChannel])
+        #theSignalPower = self.getFFTpower(theSignalFrequency,self.powerspectrum[theSignalChannel])
         
         # divide the signal power of all channels through signal power of the signal channel
         for i in range(0,NUMBER_OF_CHANNELS):
@@ -470,6 +484,20 @@ class MainWindow(QtGui.QMainWindow):
             else:
                 self.amplitudeVsTime[timeIndex] = (self.amplitudeVsTime[timeIndex]*self.amplitudeVsTimeCounter[timeIndex] + np.sqrt(theSignalPower)) / (self.amplitudeVsTimeCounter[timeIndex]+1)
                 self.amplitudeVsTimeCounter[timeIndex] += 1
+        
+        # rms and mean vs frequency
+        signalRms = np.std(self.signal[theSignalChannel])
+        signalMean = np.mean(self.signal[theSignalChannel])
+        for f in range(theSignalFrequency-512,theSignalFrequency+512):
+            if theSignalFrequency < 0 or theSignalFrequency > NUMBER_OF_SAMPLES/2:
+                continue
+            if self.rmsVsFrequencyCounter[f] == 0:
+                self.rmsVsFrequency[f] = signalRms
+                self.meanVsFrequency[f] = signalMean
+            else:
+                self.rmsVsFrequency[f] = (self.rmsVsFrequency[f]*self.rmsVsFrequencyCounter[f] + signalRms) / (self.rmsVsFrequencyCounter[f]+1)
+                self.meanVsFrequency[f] = (self.meanVsFrequency[f]*self.rmsVsFrequencyCounter[f] + signalMean) / (self.rmsVsFrequencyCounter[f]+1)
+            self.rmsVsFrequencyCounter[f] += 1
         
         # check for signal channel change
         if self.signalChannel != theSignalChannel:
@@ -521,8 +549,17 @@ class MainWindow(QtGui.QMainWindow):
                     self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.frequencyResponse / respMax)
                 else:
                     self.curve2[i].clear()
-        # plot amplitude vs time
+        # plot amplitude over frequency
         elif self.measurementsSelection.currentIndex() == 4:
+            self.plot2.setLabel('bottom','Frequency [kHz]')
+            self.plot2.setLabel('left','Amplitude')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                if i == self.signalChannel:
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],np.sqrt(self.frequencyResponse))
+                else:
+                    self.curve2[i].clear()
+        # plot amplitude vs time
+        elif self.measurementsSelection.currentIndex() == 5:
             self.plot2.setLabel('bottom','Time [0.1s]')
             self.plot2.setLabel('left','Amplitude')
             for i in range(0,NUMBER_OF_CHANNELS):
@@ -530,8 +567,27 @@ class MainWindow(QtGui.QMainWindow):
                     self.curve2[i].setData(self.amplitudeVsTime)
                 else:
                     self.curve2[i].clear()
+        # plot RMS over frequency
+        elif self.measurementsSelection.currentIndex() == 6:
+            self.plot2.setLabel('bottom','Frequency [kHz]')
+            self.plot2.setLabel('left','RMS')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                if i == self.signalChannel:
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.rmsVsFrequency)
+                else:
+                    self.curve2[i].clear()
+        # plot Mean over frequency
+        elif self.measurementsSelection.currentIndex() == 7:
+            self.plot2.setLabel('bottom','Frequency [kHz]')
+            self.plot2.setLabel('left','MEAN')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                if i == self.signalChannel:
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.meanVsFrequency)
+                else:
+                    self.curve2[i].clear()
         else:
             QtGui.QMessageBox.information(self, "Error", "Unknown measurement type selected: "+str(self.measurementsSelection.currentIndex()))
+            sys.exit(1)
 
         # update mean and RMS values
         for i in range(0,NUMBER_OF_CHANNELS):
