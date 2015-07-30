@@ -8,6 +8,7 @@ martin.hierholzer@desy.de
 '''
 
 # system libraries and numpy
+import os.path
 import sys
 import time
 import datetime
@@ -23,11 +24,19 @@ import pyqtgraph as pg
 
 # ad16 library
 import libad16
+from numpy import NaN, mean
 
 # some constants: number of channels is fixed in hardware
 NUMBER_OF_CHANNELS = 16
 # the number of samples (per channel) is currently fixed, this is a firmware limitation and will change in future
 NUMBER_OF_SAMPLES = 65536
+# maximum number of 1/10 seconds to display in amplitude vs. time view
+NUMBER_OF_TIME_SLICES = 6000 
+# to determine the amplitude, the FFT is integrated over a window around the peak: (-FFT_INTEGRATION_HALF_WINDOW:FFT_INTEGRATION_HALF_WINDOW)
+FFT_INTEGRATION_HALF_WINDOW = np.int( np.round(250./(79100./NUMBER_OF_SAMPLES)) )  # 250 Hz
+# time step in milliseconds (inverse sampling rate)
+TIME_STEP = 1./79.1
+
 
 class MainWindow(QtGui.QMainWindow):
 
@@ -49,7 +58,8 @@ class MainWindow(QtGui.QMainWindow):
         self.plot.setRange(QtCore.QRectF(0, -2**17, 1./79.1*NUMBER_OF_SAMPLES, 2**18))
         self.plot.setLabel('bottom','Time [ms]')
         self.plot.setLabel('left','ADC value')
-        self.grid.addWidget(self.plot,1,0,1,35)
+        self.plot.getPlotItem().getViewBox().setMouseMode(pg.ViewBox.RectMode)
+        self.grid.addWidget(self.plot,1,0,1,18)
 
         self.plot2 = pg.PlotWidget()
         self.curve2 = []
@@ -61,7 +71,8 @@ class MainWindow(QtGui.QMainWindow):
         #self.plot2.setRange(QtCore.QRectF(0, 0.0000000001, 79.1/2., 1.0))
         self.plot2.setLabel('bottom','Frequency [kHz]')
         self.plot2.setLabel('left','Power Spectrum Density')
-        self.grid.addWidget(self.plot2,2,0,1,35)
+        self.plot2.getPlotItem().getViewBox().setMouseMode(pg.ViewBox.RectMode)
+        self.grid.addWidget(self.plot2,2,0,1,18)
         
         self.text1 = QtGui.QLabel('Sampling rate:')
         self.grid.addWidget(self.text1,3,0)
@@ -82,7 +93,7 @@ class MainWindow(QtGui.QMainWindow):
         self.grid.addWidget(self.samples,4,1,1,3)
         
         self.startStopButton = QtGui.QPushButton('Start')
-        self.grid.addWidget(self.startStopButton,3,32,1,3)
+        self.grid.addWidget(self.startStopButton,3,15,1,3)
         self.DAQrunning = 0
         self.startStopButton.clicked.connect(self.clickStartStop)
         
@@ -90,44 +101,64 @@ class MainWindow(QtGui.QMainWindow):
         self.text3 = QtGui.QLabel('Channels:')
         self.grid.addWidget(self.text3,5,0)
         self.chn = []
-        self.chnlabel = []
         for i in range(0,NUMBER_OF_CHANNELS):
-            self.chn.append(QtGui.QCheckBox())
+            self.chn.append(QtGui.QCheckBox(str(i)))
             if i == 0:
                 self.chn[i].setChecked(1)
-            self.grid.addWidget(self.chn[i],5,1+2*i)
-            self.chnlabel.append(QtGui.QLabel(str(i)))
-            
             pal = QtGui.QPalette()
             pal.setColor(QtGui.QPalette.WindowText, pg.intColor(i))
-            self.chnlabel[i].setPalette(pal)
-            
-            self.grid.addWidget(self.chnlabel[i],5,2+2*i)
+            self.chn[i].setPalette(pal)
+            self.grid.addWidget(self.chn[i],5,1+i)
         
         self.toggleChannelsButton = QtGui.QPushButton('toggle all')
-        self.grid.addWidget(self.toggleChannelsButton,5,34)
+        self.grid.addWidget(self.toggleChannelsButton,5,17)
         self.toggleChannelsButton.clicked.connect(self.clickToggleChannels)
         
         self.text4 = QtGui.QLabel('FFT:')
         self.grid.addWidget(self.text4,6,0)
         self.fft = []
-        self.fftlabel = []
         for i in range(0,NUMBER_OF_CHANNELS):
-            self.fft.append(QtGui.QCheckBox())
+            self.fft.append(QtGui.QCheckBox(str(i)))
             if i == 0:
-                self.fft[i].setChecked(1)
-            self.grid.addWidget(self.fft[i],6,1+2*i)
-            self.fftlabel.append(QtGui.QLabel(str(i)))
-            
+                self.fft[i].setChecked(True)
             pal = QtGui.QPalette()
             pal.setColor(QtGui.QPalette.WindowText, pg.intColor(i))
-            self.fftlabel[i].setPalette(pal)
-            
-            self.grid.addWidget(self.fftlabel[i],6,2+2*i)
+            self.fft[i].setPalette(pal)
+            self.grid.addWidget(self.fft[i],6,1+i)
 
         self.toggleFFTsButton = QtGui.QPushButton('toggle all')
-        self.grid.addWidget(self.toggleFFTsButton,6,34)
+        self.grid.addWidget(self.toggleFFTsButton,6,17)
         self.toggleFFTsButton.clicked.connect(self.clickToggleFFTs)
+        
+        self.text5 = QtGui.QLabel('Measurements:')
+        self.grid.addWidget(self.text5,7,0)
+        self.enableMeasurements = QtGui.QCheckBox('enable')
+        self.grid.addWidget(self.enableMeasurements,7,1,1,2)
+
+        self.resetMeasurementsButton = QtGui.QPushButton('reset')
+        self.grid.addWidget(self.resetMeasurementsButton,7,3,1,2)
+        self.resetMeasurementsButton.clicked.connect(self.resetMeasurements)
+
+        self.measurementsSelection = QtGui.QComboBox()
+        self.measurementsSelection.addItem("Power Spectrum", 1)
+        self.measurementsSelection.addItem("Amplitude Spectrum", 2)
+        self.measurementsSelection.addItem("Crosstalk", 3)
+        self.measurementsSelection.addItem("Frequency Response", 4)
+        self.measurementsSelection.addItem("Amplitude over Time", 5)
+        self.grid.addWidget(self.measurementsSelection,7,5,1,3)
+        self.connect(self.measurementsSelection, QtCore.SIGNAL('activated(QString)'), self.updateLowerPlot)
+
+        self.grid.addWidget(QtGui.QLabel('Channel Mean:'),8,0)
+        self.textChannelMean = []
+        for i in range(0,NUMBER_OF_CHANNELS):
+            self.textChannelMean.append(QtGui.QLabel('n/a'))
+            self.grid.addWidget(self.textChannelMean[i],8,1+i)
+
+        self.grid.addWidget(QtGui.QLabel('Channel RMS:'),9,0)
+        self.textChannelRMS = []
+        for i in range(0,NUMBER_OF_CHANNELS):
+            self.textChannelRMS.append(QtGui.QLabel('n/a'))
+            self.grid.addWidget(self.textChannelRMS[i],9,1+i)
 
         self.widget = QtGui.QWidget();
         self.widget.setLayout(self.grid);
@@ -144,9 +175,15 @@ class MainWindow(QtGui.QMainWindow):
         
         self.show()
         
+        # initialise arrays by resetting the measurements once
+        self.resetMeasurements()
+        
         # open AD16 and start first conversion
         self.ad16 = libad16.ad16()
-        self.ad16.open("ad16dummy.map","ad16dummy.map")
+        if os.path.exists('/dev/llrfutcs5'):
+            self.ad16.open("/dev/llrfutcs5","ad16dummy.map")
+        else:
+            self.ad16.open("ad16dummy.map","ad16dummy.map")
         #self.ad16.setMode(libad16.mode.SOFTWARE_TRIGGER)
         #self.ad16.startConversion()
         
@@ -177,7 +214,7 @@ class MainWindow(QtGui.QMainWindow):
             self.fft[i].toggle()
 
     def makeMenu(self):
-        self._saveAction = QtGui.QAction("&Save current data...", None)
+        self._saveAction = QtGui.QAction("&Save current time-domain data...", None)
         self.connect(self._saveAction, QtCore.SIGNAL('triggered()'), self.slotSave)
 
         self._exitAction = QtGui.QAction("&Close", None)
@@ -204,7 +241,7 @@ class MainWindow(QtGui.QMainWindow):
         # create file-save dialog
         dlg = QFileDialog(self)
         dlg.setAcceptMode(QFileDialog.AcceptSave)
-        dlg.setWindowTitle('Save current data')
+        dlg.setWindowTitle('Save current time-domain data')
         dlg.setViewMode( QtGui.QFileDialog.Detail )
         dlg.setNameFilters( [self.tr('CSV Files (*.csv)'), self.tr('Compressed CSV Files (*.csv.gz)'), self.tr('All Files (*)')] )
         dlg.setDefaultSuffix('csv')
@@ -245,6 +282,31 @@ class MainWindow(QtGui.QMainWindow):
     def slotHelp(self):
         QtGui.QMessageBox.information(self, "Help", "Ask Cezary!")
         
+    def resetMeasurements(self):
+        self.ratio = np.zeros( (NUMBER_OF_CHANNELS,NUMBER_OF_SAMPLES/2), dtype=np.float64)
+        self.ratioCounter = np.zeros( (NUMBER_OF_CHANNELS,NUMBER_OF_SAMPLES/2), dtype=np.int32)
+        self.frequencyResponse = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.float64)
+        self.frequencyResponseCounter = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.int32)
+        self.amplitudeVsTime = np.zeros( NUMBER_OF_TIME_SLICES, dtype=np.float64)  # x-axis in 1/10 seconds
+        self.amplitudeVsTimeCounter = np.zeros( NUMBER_OF_TIME_SLICES, dtype=np.int32)
+        self.sweepCounter = 0
+        self.sweepStart = time.time()
+        self.lastFrequency = -999
+        self.signalChannel = -1
+        for k in range(0,NUMBER_OF_SAMPLES/2):
+            self.frequencyResponse[k] = np.NaN
+            for i in range(0,NUMBER_OF_CHANNELS):
+                self.ratio[i][k] = np.NaN
+        for k in range(0,NUMBER_OF_TIME_SLICES):
+            self.amplitudeVsTime[k] = np.NaN
+        self.channelMean =  np.zeros(NUMBER_OF_CHANNELS, dtype=np.float64)
+        self.channelRMS =  np.zeros(NUMBER_OF_CHANNELS, dtype=np.float64)
+        for k in range(0,NUMBER_OF_CHANNELS):
+            self.channelMean[k] = np.NaN
+            self.channelRMS[k] = np.NaN
+        self.counterMeanAndRMS = 0
+
+        
     def updateplot(self):
         '''
         Here goes all the magic
@@ -271,8 +333,7 @@ class MainWindow(QtGui.QMainWindow):
             self.ad16.getChannelData(i, self.signal[i])
 
         # compute x-axis values
-        time_step = 1./79.1
-        self.times = np.linspace(0., time_step*float(NUMBER_OF_SAMPLES), num=NUMBER_OF_SAMPLES, endpoint=False)
+        self.times = np.linspace(0., TIME_STEP*float(NUMBER_OF_SAMPLES), num=NUMBER_OF_SAMPLES, endpoint=False)
         
         # trigger next conversion
         self.ad16.startConversion()
@@ -281,15 +342,18 @@ class MainWindow(QtGui.QMainWindow):
         time_get_image = time.time()
 
         # calculate fourier transform
-        powerspectrum = np.zeros( (NUMBER_OF_CHANNELS,NUMBER_OF_SAMPLES), dtype=np.float64)
+        self.powerspectrum = np.zeros( (NUMBER_OF_CHANNELS,NUMBER_OF_SAMPLES), dtype=np.float64)
         for i in range(0,NUMBER_OF_CHANNELS):
-            if self.fft[i].isChecked():
-                powerspectrum[i] = np.abs(np.fft.fft(self.signal[i]))**2 / NUMBER_OF_SAMPLES 
-                #powerspectrum[i] = powerspectrum[i]/np.linalg.norm(powerspectrum[i]) * np.linalg.norm(np.abs(self.signal[i])**2)
+            signal = self.signal[i] * np.hamming(NUMBER_OF_SAMPLES)
+            self.powerspectrum[i] = np.abs(np.fft.fft(signal))**2 / NUMBER_OF_SAMPLES 
         
-        freqs = np.fft.fftfreq(self.signal[0].size, time_step)
-        idx   = np.argsort(freqs)
-        
+        self.freqs = np.fft.fftfreq(self.signal[0].size, TIME_STEP)
+        self.idx   = np.argsort(self.freqs)
+
+        # perform measurements, if enabled
+        if self.enableMeasurements.isChecked():
+            self.performMeasurements()
+            
         # take time for the calculations
         time_calc_image = time.time()
         
@@ -300,33 +364,179 @@ class MainWindow(QtGui.QMainWindow):
             else:
                 self.curve[i].clear()
         
-        # plot the power spectrum
-        for i in range(0,NUMBER_OF_CHANNELS):
-            if self.fft[i].isChecked():
-                self.curve2[i].setData(freqs[idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]],powerspectrum[i][idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]])
-            else:
-                self.curve2[i].clear()
+        self.updateLowerPlot()
 
         # take time for plotting
         time_plot_image = time.time()
         
         # What the hell is going on ... put info into statusbar
+        if self.signalChannel == -1:
+            signalChannelText = '(not yet determined)'
+        elif self.signalChannel == -2:
+            signalChannelText = '*** CHANGED DURING MEASUREMENT ***'
+        else:
+            signalChannelText = str(self.signalChannel)
         self.statusBar.showMessage(
             'Block: %i\
         \tfps: %.4fpps\
         \tAcq: %.3fms\
         \tCalc: %.3fms\
-        \tPlot: %.3fms'
+        \tPlot: %.3fms\
+        \tFrequency: %.3f kHz\
+        \tSweeps: %d\
+        \tSignal Channel: %s'
             %(self.counter, fps,
             1000 * (time_get_image - self.start_time),
             1000 * (time_calc_image - time_get_image),
-            1000 * (time_plot_image - time_calc_image)))
+            1000 * (time_plot_image - time_calc_image),
+            self.freqs[self.lastFrequency], self.sweepCounter, signalChannelText))
 
         # update sample rate and number of samples
         #val = self.samplingRate.itemData(self.samplingRate.currentIndex()).toPyObject()
         #self.ad16.setSamplingRate(val)
         #self.ad16.setSamplesPerBlock( self.samples.value() )
         
+        
+    def getFFTpower(self,frequencyIndex,spectrum):
+        integral = 0
+        for f in range(frequencyIndex-FFT_INTEGRATION_HALF_WINDOW,frequencyIndex+FFT_INTEGRATION_HALF_WINDOW):
+            integral += spectrum[f]
+        return integral
+
+    def performMeasurements(self):
+        
+        # Mean and RMS of all channels
+        for i in range(0,NUMBER_OF_CHANNELS):
+            mean = np.mean(self.signal[i])
+            rms = np.std(self.signal[i])
+            if self.counterMeanAndRMS == 0:
+                self.channelMean[i] = mean
+                self.channelRMS[i] = rms
+            else:
+                self.channelMean[i] = (self.channelMean[i]*self.counterMeanAndRMS + mean) / (self.counterMeanAndRMS+1) 
+                self.channelRMS[i] =(self.channelRMS[i]*self.counterMeanAndRMS + rms) / (self.counterMeanAndRMS+1) 
+        self.counterMeanAndRMS += 1
+        
+        # measure cross talk:
+        # first channel with maximum signal power, since this will be the reference
+        theSignalChannel = -1.
+        theSignalMaximum = -1.
+        for i in range(0,NUMBER_OF_CHANNELS):
+            theChannelMaximum = np.amax(self.powerspectrum[i])
+            if(theChannelMaximum > theSignalMaximum):
+                theSignalMaximum = theChannelMaximum
+                theSignalChannel = i
+        
+        # determine frequency of input signal (maximuim of fft)
+        theSignalFrequency = np.abs(self.idx[np.argmax(self.powerspectrum[theSignalChannel])] - NUMBER_OF_SAMPLES/2)
+        
+        # determine power of input signal (integrated FFT around peak)
+        theSignalPower = self.getFFTpower(theSignalFrequency,self.powerspectrum[theSignalChannel])
+        
+        # divide the signal power of all channels through signal power of the signal channel
+        for i in range(0,NUMBER_OF_CHANNELS):
+            power = self.getFFTpower(theSignalFrequency,self.powerspectrum[i])
+            ratio = power/theSignalPower
+            for f in range(theSignalFrequency-512,theSignalFrequency+512):
+                if theSignalFrequency < 0 or theSignalFrequency > NUMBER_OF_SAMPLES/2:
+                    continue
+                if self.ratioCounter[i][f] == 0:
+                    self.ratio[i][f] = ratio
+                else:
+                    self.ratio[i][f] = (self.ratio[i][f]*self.ratioCounter[i][f] + ratio) / (self.ratioCounter[i][f]+1)
+                self.ratioCounter[i][f] += 1
+        
+        # measure frequency response (using information determined in the cross-talk measurement)
+        for f in range(theSignalFrequency-512,theSignalFrequency+512):
+            if theSignalFrequency < 0 or theSignalFrequency > NUMBER_OF_SAMPLES/2:
+                continue
+            if self.frequencyResponseCounter[f] == 0:
+                self.frequencyResponse[f] = theSignalPower
+            else:
+                self.frequencyResponse[f] = (self.frequencyResponse[f]*self.frequencyResponseCounter[f] + theSignalPower) / (self.frequencyResponseCounter[f]+1)
+            self.frequencyResponseCounter[f] += 1
+        
+        # check if frequency sweep completed (i.e. signal frequency lower than last)
+        if theSignalFrequency < self.lastFrequency*0.9:
+            self.sweepCounter += 1
+            self.sweepStart = time.time()
+        self.lastFrequency = theSignalFrequency
+        
+        # signal amplitude vs. time
+        timeIndex = np.round(10.*(time.time()-self.sweepStart))  # in 1/10 seconds
+        if timeIndex < NUMBER_OF_TIME_SLICES:
+            if self.amplitudeVsTimeCounter[timeIndex] == 0:
+                self.amplitudeVsTime[timeIndex] = np.sqrt(theSignalPower)
+            else:
+                self.amplitudeVsTime[timeIndex] = (self.amplitudeVsTime[timeIndex]*self.amplitudeVsTimeCounter[timeIndex] + np.sqrt(theSignalPower)) / (self.amplitudeVsTimeCounter[timeIndex]+1)
+                self.amplitudeVsTimeCounter[timeIndex] += 1
+        
+        # check for signal channel change
+        if self.signalChannel != theSignalChannel:
+            if self.signalChannel == -1:
+                self.signalChannel = theSignalChannel
+            elif self.signalChannel != -2:
+                self.signalChannel = -2     # will give also a warning in the status bar
+                QtGui.QMessageBox.information(self, "Warning", "Signal channel changed. Resetting measurements recommended!")
+
+
+    def updateLowerPlot(self):
+        
+        # plot the power spectrum
+        if self.measurementsSelection.currentIndex() == 0:
+            self.plot2.setLabel('bottom','Frequency [kHz]')
+            self.plot2.setLabel('left','Power')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                if self.fft[i].isChecked():
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]],self.powerspectrum[i][self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]])
+                else:
+                    self.curve2[i].clear()
+        # plot the amplitude spectrum
+        elif self.measurementsSelection.currentIndex() == 1:
+            self.plot2.setLabel('bottom','Frequency [kHz]')
+            self.plot2.setLabel('left','Amplitude')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                if self.fft[i].isChecked():
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]],np.sqrt(self.powerspectrum[i][self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]]))
+                else:
+                    self.curve2[i].clear()
+        # plot cross talk
+        elif self.measurementsSelection.currentIndex() == 2:
+            self.plot2.setLabel('bottom','Frequency [kHz]')
+            self.plot2.setLabel('left','Crosstalk')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                if self.fft[i].isChecked():
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.ratio[i])
+                else:
+                    self.curve2[i].clear()
+        # plot frequency response
+        elif self.measurementsSelection.currentIndex() == 3:
+            self.plot2.setLabel('bottom','Frequency [kHz]')
+            self.plot2.setLabel('left','Response')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                if i == self.signalChannel:
+                    respMax = np.nanmax(self.frequencyResponse[1024:NUMBER_OF_SAMPLES/8])
+                    if respMax != respMax:
+                        respMax = 1
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.frequencyResponse / respMax)
+                else:
+                    self.curve2[i].clear()
+        # plot amplitude vs time
+        elif self.measurementsSelection.currentIndex() == 4:
+            self.plot2.setLabel('bottom','Time [0.1s]')
+            self.plot2.setLabel('left','Amplitude')
+            for i in range(0,NUMBER_OF_CHANNELS):
+                if i == self.signalChannel:
+                    self.curve2[i].setData(self.amplitudeVsTime)
+                else:
+                    self.curve2[i].clear()
+        else:
+            QtGui.QMessageBox.information(self, "Error", "Unknown measurement type selected: "+str(self.measurementsSelection.currentIndex()))
+
+        # update mean and RMS values
+        for i in range(0,NUMBER_OF_CHANNELS):
+            self.textChannelMean[i].setText('%4.2f'%(self.channelMean[i]))
+            self.textChannelRMS[i].setText('%4.2f'%(self.channelRMS[i]))
 
        
 if __name__ == '__main__':
