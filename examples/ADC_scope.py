@@ -74,8 +74,7 @@ class MainWindow(QtGui.QMainWindow):
         self.plot2.getPlotItem().getViewBox().setMouseMode(pg.ViewBox.RectMode)
         self.grid.addWidget(self.plot2,2,0,1,18)
         
-        self.text1 = QtGui.QLabel('Sampling rate:')
-        self.grid.addWidget(self.text1,3,0)
+        self.grid.addWidget(QtGui.QLabel('Sampling rate:'),3,0)
         self.samplingRate = QtGui.QComboBox()
         #self.samplingRate.addItem("100 kHz", libad16.rate.Hz100000)
         #self.samplingRate.addItem("50 kHz", libad16.rate.Hz50000)
@@ -85,8 +84,7 @@ class MainWindow(QtGui.QMainWindow):
         self.samplingRate.addItem("79.1 kHz", libad16.rate.Hz100000)
         self.grid.addWidget(self.samplingRate,3,1,1,3)
         
-        self.text2 = QtGui.QLabel('Number of samples per channel:')
-        self.grid.addWidget(self.text2,4,0)
+        self.grid.addWidget(QtGui.QLabel('Number of samples per channel:'),4,0)
         self.samples = QtGui.QSpinBox()
         self.samples.setRange(NUMBER_OF_SAMPLES,NUMBER_OF_SAMPLES)
         self.samples.setValue(NUMBER_OF_SAMPLES)
@@ -98,8 +96,7 @@ class MainWindow(QtGui.QMainWindow):
         self.startStopButton.clicked.connect(self.clickStartStop)
         
         
-        self.text3 = QtGui.QLabel('Channels:')
-        self.grid.addWidget(self.text3,5,0)
+        self.grid.addWidget(QtGui.QLabel('Channels:'),5,0)
         self.chn = []
         for i in range(0,NUMBER_OF_CHANNELS):
             self.chn.append(QtGui.QCheckBox(str(i)))
@@ -114,8 +111,7 @@ class MainWindow(QtGui.QMainWindow):
         self.grid.addWidget(self.toggleChannelsButton,5,17)
         self.toggleChannelsButton.clicked.connect(self.clickToggleChannels)
         
-        self.text4 = QtGui.QLabel('FFT:')
-        self.grid.addWidget(self.text4,6,0)
+        self.grid.addWidget(QtGui.QLabel('FFT:'),6,0)
         self.fft = []
         for i in range(0,NUMBER_OF_CHANNELS):
             self.fft.append(QtGui.QCheckBox(str(i)))
@@ -130,8 +126,7 @@ class MainWindow(QtGui.QMainWindow):
         self.grid.addWidget(self.toggleFFTsButton,6,17)
         self.toggleFFTsButton.clicked.connect(self.clickToggleFFTs)
         
-        self.text5 = QtGui.QLabel('Measurements:')
-        self.grid.addWidget(self.text5,7,0)
+        self.grid.addWidget(QtGui.QLabel('Measurements:'),7,0)
         self.enableMeasurements = QtGui.QCheckBox('enable')
         self.grid.addWidget(self.enableMeasurements,7,1,1,2)
 
@@ -165,6 +160,13 @@ class MainWindow(QtGui.QMainWindow):
         for i in range(0,NUMBER_OF_CHANNELS):
             self.textChannelRMS.append(QtGui.QLabel('n/a'))
             self.grid.addWidget(self.textChannelRMS[i],9,1+i)
+
+        self.grid.addWidget(QtGui.QLabel('Measurement Parameters:'),10,0)
+        self.grid.addWidget(QtGui.QLabel('Averaging window size:'),10,1,1,3)
+        self.inpAverageWindow = QtGui.QSpinBox()
+        self.inpAverageWindow.setRange(0,4096)
+        self.inpAverageWindow.setValue(512)
+        self.grid.addWidget(self.inpAverageWindow,10,4)
 
         self.widget = QtGui.QWidget();
         self.widget.setLayout(self.grid);
@@ -527,17 +529,14 @@ class MainWindow(QtGui.QMainWindow):
                 self.signalChannel = -2     # will give also a warning in the status bar
                 QtGui.QMessageBox.information(self, "Warning", "Signal channel changed. Resetting measurements recommended!")
         
-        # determine frequency of input signal (maximuim of fft)
-        #theSignalFrequency = np.abs(self.idx[np.argmax(self.powerspectrum[theSignalChannel])] - NUMBER_OF_SAMPLES/2)
-        
-        # determine power of input signal (integrated FFT around peak)
-        #theSignalPower = self.getFFTpower(theSignalFrequency,self.powerspectrum[theSignalChannel])
+        # window width to average measurement data over
+        avgWindow = self.inpAverageWindow.value()
         
         # divide the signal power of all channels through signal power of the signal channel
         for i in range(0,NUMBER_OF_CHANNELS):
             power = self.getFFTpower(theSignalFrequency,self.powerspectrum[i])
             ratio = power/theSignalPower
-            for f in range(theSignalFrequency-512,theSignalFrequency+512):
+            for f in range(theSignalFrequency-avgWindow,theSignalFrequency+avgWindow):
                 if theSignalFrequency < 0 or theSignalFrequency > NUMBER_OF_SAMPLES/2:
                     continue
                 if self.ratioCounter[i][f] == 0:
@@ -547,7 +546,7 @@ class MainWindow(QtGui.QMainWindow):
                 self.ratioCounter[i][f] += 1
         
         # measure frequency response (using information determined in the cross-talk measurement)
-        for f in range(theSignalFrequency-512,theSignalFrequency+512):
+        for f in range(theSignalFrequency-avgWindow,theSignalFrequency+avgWindow):
             if theSignalFrequency < 0 or theSignalFrequency > NUMBER_OF_SAMPLES/2:
                 continue
             if self.frequencyResponseCounter[f] == 0:
@@ -574,7 +573,7 @@ class MainWindow(QtGui.QMainWindow):
         # rms and mean vs frequency
         signalRms = np.std(self.signal[theSignalChannel])
         signalMean = np.mean(self.signal[theSignalChannel])
-        for f in range(theSignalFrequency-512,theSignalFrequency+512):
+        for f in range(theSignalFrequency-avgWindow,theSignalFrequency+avgWindow):
             if theSignalFrequency < 0 or theSignalFrequency > NUMBER_OF_SAMPLES/2:
                 continue
             if self.rmsVsFrequencyCounter[f] == 0:
@@ -594,7 +593,9 @@ class MainWindow(QtGui.QMainWindow):
             self.plot2.setLabel('left','Power')
             for i in range(0,NUMBER_OF_CHANNELS):
                 if self.fft[i].isChecked():
-                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]],self.powerspectrum[i][self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]])
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]],
+                                           self.powerspectrum[i][self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]],
+                                           connect="finite")
                 else:
                     self.curve2[i].clear()
         # plot the amplitude spectrum
@@ -603,7 +604,9 @@ class MainWindow(QtGui.QMainWindow):
             self.plot2.setLabel('left','Amplitude')
             for i in range(0,NUMBER_OF_CHANNELS):
                 if self.fft[i].isChecked():
-                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]],np.sqrt(self.powerspectrum[i][self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]]))
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]],
+                                           np.sqrt(self.powerspectrum[i][self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES-1]]),
+                                           connect="finite")
                 else:
                     self.curve2[i].clear()
         # plot cross talk
@@ -612,7 +615,8 @@ class MainWindow(QtGui.QMainWindow):
             self.plot2.setLabel('left','Crosstalk')
             for i in range(0,NUMBER_OF_CHANNELS):
                 if self.fft[i].isChecked():
-                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.ratio[i])
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.ratio[i],
+                                           connect="finite")
                 else:
                     self.curve2[i].clear()
         # plot frequency response
@@ -624,7 +628,9 @@ class MainWindow(QtGui.QMainWindow):
                     respMax = np.nanmax(self.frequencyResponse[1024:NUMBER_OF_SAMPLES/8])
                     if respMax != respMax:
                         respMax = 1
-                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.frequencyResponse / respMax)
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],
+                                           self.frequencyResponse / respMax,
+                                           connect="finite")
                 else:
                     self.curve2[i].clear()
         # plot amplitude over frequency
@@ -633,7 +639,9 @@ class MainWindow(QtGui.QMainWindow):
             self.plot2.setLabel('left','Amplitude')
             for i in range(0,NUMBER_OF_CHANNELS):
                 if i == self.signalChannel:
-                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],np.sqrt(self.frequencyResponse))
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],
+                                           np.sqrt(self.frequencyResponse),
+                                           connect="finite")
                 else:
                     self.curve2[i].clear()
         # plot amplitude vs time
@@ -642,7 +650,7 @@ class MainWindow(QtGui.QMainWindow):
             self.plot2.setLabel('left','Amplitude')
             for i in range(0,NUMBER_OF_CHANNELS):
                 if i == self.signalChannel:
-                    self.curve2[i].setData(self.amplitudeVsTime)
+                    self.curve2[i].setData(self.amplitudeVsTime,connect="finite")
                 else:
                     self.curve2[i].clear()
         # plot RMS over frequency
@@ -651,7 +659,9 @@ class MainWindow(QtGui.QMainWindow):
             self.plot2.setLabel('left','RMS')
             for i in range(0,NUMBER_OF_CHANNELS):
                 if i == self.signalChannel:
-                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.rmsVsFrequency)
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],
+                                           self.rmsVsFrequency,
+                                           connect="finite")
                 else:
                     self.curve2[i].clear()
         # plot Mean over frequency
@@ -660,7 +670,9 @@ class MainWindow(QtGui.QMainWindow):
             self.plot2.setLabel('left','MEAN')
             for i in range(0,NUMBER_OF_CHANNELS):
                 if i == self.signalChannel:
-                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],self.meanVsFrequency)
+                    self.curve2[i].setData(self.freqs[self.idx[NUMBER_OF_SAMPLES/2:NUMBER_OF_SAMPLES]],
+                                           self.meanVsFrequency,
+                                           connect="finite")
                 else:
                     self.curve2[i].clear()
         else:
