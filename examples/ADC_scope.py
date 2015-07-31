@@ -148,8 +148,11 @@ class MainWindow(QtGui.QMainWindow):
         self.measurementsSelection.addItem("Amplitude over Time")
         self.measurementsSelection.addItem("RMS over Frequency")
         self.measurementsSelection.addItem("Mean over Frequency")
-        self.grid.addWidget(self.measurementsSelection,7,5,1,3)
+        self.grid.addWidget(self.measurementsSelection,7,5,1,5)
         self.connect(self.measurementsSelection, QtCore.SIGNAL('activated(QString)'), self.updateLowerPlot)
+
+        self.lockSignalChannel = QtGui.QCheckBox('lock signal channel')
+        self.grid.addWidget(self.lockSignalChannel,7,10,1,3)
 
         self.grid.addWidget(QtGui.QLabel('Channel Mean:'),8,0)
         self.textChannelMean = []
@@ -220,6 +223,12 @@ class MainWindow(QtGui.QMainWindow):
         self._saveAction = QtGui.QAction("&Save current time-domain data...", None)
         self.connect(self._saveAction, QtCore.SIGNAL('triggered()'), self.slotSave)
 
+        self._saveMeasurementsAction = QtGui.QAction("&Save current measurement data...", None)
+        self.connect(self._saveMeasurementsAction, QtCore.SIGNAL('triggered()'), self.saveMeasurements)
+
+        self._loadMeasurementsAction = QtGui.QAction("&Load current measurement data...", None)
+        self.connect(self._loadMeasurementsAction, QtCore.SIGNAL('triggered()'), self.loadMeasurements)
+
         self._exitAction = QtGui.QAction("&Close", None)
         self.connect(self._exitAction, QtCore.SIGNAL('triggered()'), self.slotClose)
         
@@ -229,6 +238,8 @@ class MainWindow(QtGui.QMainWindow):
         menuBar = self.menuBar()
         fileMenu = menuBar.addMenu("&File")
         fileMenu.addAction(self._saveAction)
+        fileMenu.addAction(self._saveMeasurementsAction)
+        fileMenu.addAction(self._loadMeasurementsAction)
         fileMenu.addAction(self._exitAction)
         
         helpMenu = menuBar.addMenu("&Help")
@@ -279,6 +290,68 @@ class MainWindow(QtGui.QMainWindow):
             # show message of success
             QtGui.QMessageBox.information(self, 'Data saved', 'Current data has been saved to file "'+name+'".')
 
+    def saveMeasurements(self):
+        
+        # create file-save dialog
+        dlg = QFileDialog(self)
+        dlg.setAcceptMode(QFileDialog.AcceptSave)
+        dlg.setWindowTitle('Save current measurement data')
+        dlg.setViewMode( QtGui.QFileDialog.Detail )
+        dlg.setNameFilters( [self.tr('numpy compressed archve (*.npz)'), self.tr('All Files (*)')] )
+        dlg.setDefaultSuffix('npz')
+        
+        # show dialog, save only if user did not cancel
+        if dlg.exec_() :
+            # file name must be converted into standard python string
+            name = str(dlg.selectedFiles()[0])
+
+            np.savez_compressed(name,ratio=self.ratio, ratioCounter=self.ratioCounter,
+                                frequencyResponse=self.frequencyResponse, frequencyResponseCounter=self.frequencyResponseCounter,
+                                amplitudeVsTime=self.amplitudeVsTime, amplitudeVsTimeCounter=self.amplitudeVsTimeCounter,
+                                rmsVsFrequency=self.rmsVsFrequency, meanVsFrequency=self.meanVsFrequency, rmsVsFrequencyCounter=self.rmsVsFrequencyCounter,
+                                channelMean=self.channelMean, channelRMS=self.channelRMS,
+                                powerspectrum=self.powerspectrum, freqs=self.freqs, idx=self.idx,
+                                singleValues=(self.sweepCounter, self.sweepStart, self.lastFrequency, self.signalChannel,self.counterMeanAndRMS) ) 
+            # show message of success
+            QtGui.QMessageBox.information(self, 'Data saved', 'Measurement data has been saved to file "'+name+'".')
+            
+
+    def loadMeasurements(self):
+        
+        # create file-save dialog
+        dlg = QFileDialog(self)
+        dlg.setAcceptMode(QFileDialog.AcceptOpen)
+        dlg.setWindowTitle('Load measurement data (current measurement data will be overwritten!)')
+        dlg.setViewMode( QtGui.QFileDialog.Detail )
+        dlg.setNameFilters( [self.tr('numpy compressed archve (*.npz)'), self.tr('All Files (*)')] )
+        dlg.setDefaultSuffix('npz')
+        
+        # show dialog, save only if user did not cancel
+        if dlg.exec_() :
+            # file name must be converted into standard python string
+            name = str(dlg.selectedFiles()[0])
+
+            data = np.load(name)
+            self.ratio = data['ratio']
+            self.ratioCounter = data['ratioCounter']
+            self.frequencyResponse = data['frequencyResponse']
+            self.frequencyResponseCounter = data['frequencyResponseCounter']
+            self.amplitudeVsTime = data['amplitudeVsTime']
+            self.amplitudeVsTimeCounter = data['amplitudeVsTimeCounter']
+            self.rmsVsFrequency = data['rmsVsFrequency']
+            self.meanVsFrequency = data['meanVsFrequency']
+            self.rmsVsFrequencyCounter = data['rmsVsFrequencyCounter']
+            self.channelMean = data['channelMean']
+            self.channelRMS = data['channelRMS']
+            self.powerspectrum = data['powerspectrum']
+            self.freqs = data['freqs']
+            self.idx = data['idx']
+            (self.sweepCounter, self.sweepStart, self.lastFrequency, self.signalChannel,self.counterMeanAndRMS) = data['singleValues'] 
+            # show message of success
+            QtGui.QMessageBox.information(self, 'Data loaded', 'Measurement data has been loaded from file "'+name+'".')
+            self.updateLowerPlot()
+            
+
     def slotClose(self):
         self.close()
 
@@ -295,10 +368,13 @@ class MainWindow(QtGui.QMainWindow):
         self.rmsVsFrequency = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.float64)
         self.meanVsFrequency = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.float64)
         self.rmsVsFrequencyCounter = np.zeros( (NUMBER_OF_SAMPLES/2), dtype=np.int32)
+        self.channelMean =  np.zeros(NUMBER_OF_CHANNELS, dtype=np.float64)
+        self.channelRMS =  np.zeros(NUMBER_OF_CHANNELS, dtype=np.float64)
         self.sweepCounter = 0
         self.sweepStart = time.time()
         self.lastFrequency = -999
         self.signalChannel = -1
+        self.counterMeanAndRMS = 0
         for k in range(0,NUMBER_OF_SAMPLES/2):
             self.frequencyResponse[k] = np.NaN
             self.rmsVsFrequency[k] = np.NaN
@@ -307,12 +383,9 @@ class MainWindow(QtGui.QMainWindow):
                 self.ratio[i][k] = np.NaN
         for k in range(0,NUMBER_OF_TIME_SLICES):
             self.amplitudeVsTime[k] = np.NaN
-        self.channelMean =  np.zeros(NUMBER_OF_CHANNELS, dtype=np.float64)
-        self.channelRMS =  np.zeros(NUMBER_OF_CHANNELS, dtype=np.float64)
         for k in range(0,NUMBER_OF_CHANNELS):
             self.channelMean[k] = np.NaN
             self.channelRMS[k] = np.NaN
-        self.counterMeanAndRMS = 0
 
         
     def updateplot(self):
@@ -427,19 +500,32 @@ class MainWindow(QtGui.QMainWindow):
                 self.channelMean[i] = (self.channelMean[i]*self.counterMeanAndRMS + mean) / (self.counterMeanAndRMS+1) 
                 self.channelRMS[i] =(self.channelRMS[i]*self.counterMeanAndRMS + rms) / (self.counterMeanAndRMS+1) 
         self.counterMeanAndRMS += 1
-        
-        # measure cross talk:
-        # first channel with maximum signal power, since this will be the reference
-        theSignalChannel = -1.
-        theSignalPower = -1.
-        theSignalFrequency = 0
+
+        # obtain frequency and power of maximum signal in each channel
+        chnSignalFrequency = np.zeros(NUMBER_OF_CHANNELS, dtype=np.int)
+        chnSignalPower = np.zeros(NUMBER_OF_CHANNELS, dtype=np.float64)
         for i in range(0,NUMBER_OF_CHANNELS):
-            chnSignalFrequency = np.argmax(self.powerspectrum[i][20:NUMBER_OF_SAMPLES/2-20])+20
-            chnSignalPower = self.getFFTpower(chnSignalFrequency,self.powerspectrum[i])
-            if(chnSignalPower > theSignalPower):
-                theSignalPower = chnSignalPower
-                theSignalChannel = i
-                theSignalFrequency = chnSignalFrequency
+            chnSignalFrequency[i] = np.argmax(self.powerspectrum[i][10:NUMBER_OF_SAMPLES/2])+10  # ignore first 10 FFT samples to get rid of DC part
+            chnSignalPower[i] = self.getFFTpower(chnSignalFrequency[i],self.powerspectrum[i])
+
+        # find signal channel (channel with maximum signal power)
+        maxSignalPower = np.amax(chnSignalPower)
+        minSignalPower = 10.*np.amin(chnSignalPower)            # 10 times more than minimum channel power ( = noise, hopefully)
+        # require signal power over threshold, otherwise keep signal channel unchanged. Also keep it unchanged if signal channel is locked
+        if(not self.lockSignalChannel.isChecked() and maxSignalPower > minSignalPower):
+            theSignalChannel = np.argmax(chnSignalPower)
+        else:
+            theSignalChannel = self.signalChannel
+        theSignalPower = chnSignalPower[theSignalChannel]
+        theSignalFrequency = chnSignalFrequency[theSignalChannel]
+
+        # check for signal channel change
+        if self.signalChannel != theSignalChannel:
+            if self.signalChannel == -1:
+                self.signalChannel = theSignalChannel
+            elif self.signalChannel != -2:
+                self.signalChannel = -2     # will give also a warning in the status bar
+                QtGui.QMessageBox.information(self, "Warning", "Signal channel changed. Resetting measurements recommended!")
         
         # determine frequency of input signal (maximuim of fft)
         #theSignalFrequency = np.abs(self.idx[np.argmax(self.powerspectrum[theSignalChannel])] - NUMBER_OF_SAMPLES/2)
@@ -498,14 +584,6 @@ class MainWindow(QtGui.QMainWindow):
                 self.rmsVsFrequency[f] = (self.rmsVsFrequency[f]*self.rmsVsFrequencyCounter[f] + signalRms) / (self.rmsVsFrequencyCounter[f]+1)
                 self.meanVsFrequency[f] = (self.meanVsFrequency[f]*self.rmsVsFrequencyCounter[f] + signalMean) / (self.rmsVsFrequencyCounter[f]+1)
             self.rmsVsFrequencyCounter[f] += 1
-        
-        # check for signal channel change
-        if self.signalChannel != theSignalChannel:
-            if self.signalChannel == -1:
-                self.signalChannel = theSignalChannel
-            elif self.signalChannel != -2:
-                self.signalChannel = -2     # will give also a warning in the status bar
-                QtGui.QMessageBox.information(self, "Warning", "Signal channel changed. Resetting measurements recommended!")
 
 
     def updateLowerPlot(self):
