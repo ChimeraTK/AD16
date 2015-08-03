@@ -165,7 +165,7 @@ class MainWindow(QtGui.QMainWindow):
         self.grid.addWidget(QtGui.QLabel('Averaging window size:'),10,1,1,3)
         self.inpAverageWindow = QtGui.QSpinBox()
         self.inpAverageWindow.setRange(0,4096)
-        self.inpAverageWindow.setValue(512)
+        self.inpAverageWindow.setValue(64)
         self.grid.addWidget(self.inpAverageWindow,10,4)
 
         self.widget = QtGui.QWidget();
@@ -173,7 +173,7 @@ class MainWindow(QtGui.QMainWindow):
         self.setCentralWidget(self.widget);
 
         self.setWindowTitle("PyQT ADC scope")
-        self.resize(800, 600)
+        self.resize(800, 800)
           
         self.makeMenu()
 
@@ -228,7 +228,7 @@ class MainWindow(QtGui.QMainWindow):
         self._saveMeasurementsAction = QtGui.QAction("&Save current measurement data...", None)
         self.connect(self._saveMeasurementsAction, QtCore.SIGNAL('triggered()'), self.saveMeasurements)
 
-        self._loadMeasurementsAction = QtGui.QAction("&Load current measurement data...", None)
+        self._loadMeasurementsAction = QtGui.QAction("&Load measurement data...", None)
         self.connect(self._loadMeasurementsAction, QtCore.SIGNAL('triggered()'), self.loadMeasurements)
 
         self._exitAction = QtGui.QAction("&Close", None)
@@ -290,7 +290,7 @@ class MainWindow(QtGui.QMainWindow):
             # close file
             f.close()
             # show message of success
-            QtGui.QMessageBox.information(self, 'Data saved', 'Current data has been saved to file "'+name+'".')
+            QtGui.QMessageBox.information(self, 'Data saved', 'Current time-domain data has been saved to file "'+name+'".')
 
     def saveMeasurements(self):
         
@@ -323,7 +323,7 @@ class MainWindow(QtGui.QMainWindow):
         # create file-save dialog
         dlg = QFileDialog(self)
         dlg.setAcceptMode(QFileDialog.AcceptOpen)
-        dlg.setWindowTitle('Load measurement data (current measurement data will be overwritten!)')
+        dlg.setWindowTitle('Load measurement data (current data will be overwritten!)')
         dlg.setViewMode( QtGui.QFileDialog.Detail )
         dlg.setNameFilters( [self.tr('numpy compressed archve (*.npz)'), self.tr('All Files (*)')] )
         dlg.setDefaultSuffix('npz')
@@ -491,6 +491,9 @@ class MainWindow(QtGui.QMainWindow):
 
     def performMeasurements(self):
         
+        # window width to average measurement data over
+        avgWindow = self.inpAverageWindow.value()
+        
         # Mean and RMS of all channels
         for i in range(0,NUMBER_OF_CHANNELS):
             mean = np.mean(self.signal[i])
@@ -512,14 +515,17 @@ class MainWindow(QtGui.QMainWindow):
 
         # find signal channel (channel with maximum signal power)
         maxSignalPower = np.amax(chnSignalPower)
-        minSignalPower = 10.*np.amin(chnSignalPower)            # 10 times more than minimum channel power ( = noise, hopefully)
+        minSignalPower = 1000.*np.amin(chnSignalPower)            # 1000 times more than minimum channel power ( = noise, hopefully) STRANGE UNITS!!!
         # require signal power over threshold, otherwise keep signal channel unchanged. Also keep it unchanged if signal channel is locked
-        if(not self.lockSignalChannel.isChecked() and maxSignalPower > minSignalPower):
+        if(not (self.signalChannel >=0 and self.lockSignalChannel.isChecked() ) and maxSignalPower > minSignalPower):
             theSignalChannel = np.argmax(chnSignalPower)
         else:
             theSignalChannel = self.signalChannel
         theSignalPower = chnSignalPower[theSignalChannel]
-        theSignalFrequency = chnSignalFrequency[theSignalChannel]
+        if theSignalPower <= minSignalPower:
+            theSignalFrequency = -2*avgWindow   # out of range, will be ignored
+        else:
+            theSignalFrequency = chnSignalFrequency[theSignalChannel]
 
         # check for signal channel change
         if self.signalChannel != theSignalChannel:
@@ -528,9 +534,6 @@ class MainWindow(QtGui.QMainWindow):
             elif self.signalChannel != -2:
                 self.signalChannel = -2     # will give also a warning in the status bar
                 QtGui.QMessageBox.information(self, "Warning", "Signal channel changed. Resetting measurements recommended!")
-        
-        # window width to average measurement data over
-        avgWindow = self.inpAverageWindow.value()
         
         # divide the signal power of all channels through signal power of the signal channel
         for i in range(0,NUMBER_OF_CHANNELS):
@@ -555,12 +558,6 @@ class MainWindow(QtGui.QMainWindow):
                 self.frequencyResponse[f] = (self.frequencyResponse[f]*self.frequencyResponseCounter[f] + theSignalPower) / (self.frequencyResponseCounter[f]+1)
             self.frequencyResponseCounter[f] += 1
         
-        # check if frequency sweep completed (i.e. signal frequency lower than last)
-        if theSignalFrequency < self.lastFrequency*0.9:
-            self.sweepCounter += 1
-            self.sweepStart = time.time()
-        self.lastFrequency = theSignalFrequency
-        
         # signal amplitude vs. time
         timeIndex = np.round(10.*(time.time()-self.sweepStart))  # in 1/10 seconds
         if timeIndex < NUMBER_OF_TIME_SLICES:
@@ -583,6 +580,13 @@ class MainWindow(QtGui.QMainWindow):
                 self.rmsVsFrequency[f] = (self.rmsVsFrequency[f]*self.rmsVsFrequencyCounter[f] + signalRms) / (self.rmsVsFrequencyCounter[f]+1)
                 self.meanVsFrequency[f] = (self.meanVsFrequency[f]*self.rmsVsFrequencyCounter[f] + signalMean) / (self.rmsVsFrequencyCounter[f]+1)
             self.rmsVsFrequencyCounter[f] += 1
+        
+        # check if frequency sweep completed (i.e. signal frequency lower than last)
+        if theSignalFrequency > 0:
+            if theSignalFrequency < self.lastFrequency*0.9:
+                self.sweepCounter += 1
+                self.sweepStart = time.time()
+            self.lastFrequency = theSignalFrequency
 
 
     def updateLowerPlot(self):
