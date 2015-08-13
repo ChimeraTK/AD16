@@ -85,7 +85,7 @@ endif(TESTING_IS_ENABLED)
 # C++ library
 add_library(${PROJECT_NAME} SHARED ${library_sources} )
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
-target_link_libraries(${PROJECT_NAME} ${MtcaMappedDevice_LIBRARIES} ${mtca4uPy_LIBRARIES} ${Boost_THREAD_LIBRARIES} ${PYTHON_LIBRARIES} -lboost_python)
+target_link_libraries(${PROJECT_NAME} ${MtcaMappedDevice_LIBRARIES} ${Boost_THREAD_LIBRARIES} ${PYTHON_LIBRARIES} -lboost_python)
 
 #configure a header file which contains the version information for use in C++
 #configure_file(cmake/version.h.in "${PROJECT_BINARY_DIR}/version.h" @ONLY)

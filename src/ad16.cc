@@ -2,8 +2,7 @@
 #include <MtcaMappedDevice/DummyDevice.h>
 #include <MtcaMappedDevice/mapFileParser.h>
 #include <MtcaMappedDevice/mapFile.h>
-#include <mtca4uPy/HelperFunctions.h>
-#include <mtca4uPy/PythonExceptions.h>
+#include <mtca4upy/HelperFunctions.h>
 #include <cstring>
 
 namespace mtca4u{
@@ -239,7 +238,7 @@ namespace mtca4u{
 
     }
     else {
-      throw mtca4upy::ArrayElementTypeNotSupported();
+      throw mtca4upy::ArrayElementTypeNotSupported("getChannelData(): Incorrect data type found in numpy array.");
     }
 
   }
