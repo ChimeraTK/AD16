@@ -1,4 +1,5 @@
 #include "ad16.h"
+#include <boost/utility/binary.hpp>
 #include <MtcaMappedDevice/DummyDevice.h>
 #include <MtcaMappedDevice/mapFileParser.h>
 #include <MtcaMappedDevice/mapFile.h>
@@ -6,7 +7,12 @@
 #include <cstring>
 
 namespace mtca4u{
-  const int32_t ad16::numberOfChannels = 16;
+
+  // initialise constants
+  const int32_t ad16::_numberOfChannels = 16;
+  const int32_t ad16::_samplesPerBlock = 65536;
+  const int32_t ad16::_numberOfTriggers = 9;
+  const float ad16::_conversionTimes[8] = { 4.15, 9.1, 18.8, 39, 78, 158, 315 }; // in usecs
 
   /*************************************************************************************************/
   void ad16::open(const std::string &deviceFileName, const std::string &mappingFileName) {
@@ -14,19 +20,8 @@ namespace mtca4u{
     // check if already opened
     if(_isOpen) throw ad16Exception("Device already opened.",ad16Exception::ALREADY_OPENED);
 
-    // open map and store maximum number of elements
+    // open register map
     _map = mapFileParser().parse(mappingFileName);
-    mapFile::mapElem areaInfo;
-    _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA",areaInfo,"APP0");
-    max_elem_nr = areaInfo.reg_elem_nr;
-
-    /* no double buffering supported by the current firmware...
-    /// check if length of buffer B is the same
-    _map->getRegisterInfo("AREA_MULTIPLEXED_SEQUENCE_BUFFER_B",areaInfo,"AD16");
-    if(max_elem_nr != areaInfo.reg_elem_nr) {
-      throw ad16Exception("Number of elements in BUFFER_A and BUFFER_B are not consistent in map file.",ad16Exception::ILLEGAL_PARAMETER);
-    }
-    */
 
     // open dummy device
     if(deviceFileName == mappingFileName){
@@ -42,7 +37,7 @@ namespace mtca4u{
     // open real device
     else {
 
-      // create the dummy device driver
+      // create the PCIe device driver
       _realDevice = boost::shared_ptr<devPCIE>( new devPCIE );
       _realDevice->openDev(deviceFileName);
 
@@ -51,96 +46,237 @@ namespace mtca4u{
       _mappedDevice->openDev( _realDevice, _map);
     }
 
-    // Initialise device. Procedure taken from Matlab code "ad16_init.m" by Lukasz Butkowski
-    int32_t val;
-
-    // send reset
-    val = 0;
-    _mappedDevice->writeReg("WORD_ADC_ENA","AD160",&val);
-    val = 0;
-    _mappedDevice->writeReg("WORD_RESET_N","BOARD0",&val);
-    usleep(100000); // 0.1 seconds
-
-    // set trigger to user trigger
-    val = SOFTWARE_TRIGGER;
-    _mappedDevice->writeReg("WORD_TIMING_TRG_SEL","APP0",&val);
-
-    // enable data taking
-    val = 1;
-    _mappedDevice->writeReg("WORD_DAQ_ENABLE","APP0",&val);
-
-    // complete initialisation
-    val = 1;
-    _mappedDevice->writeReg("WORD_RESET_N","BOARD0",&val);
-    usleep(100000); // 0.1 seconds
-
-    val = 1;
-    _mappedDevice->writeReg("WORD_ADC_RESET","AD160",&val);
-    usleep(1000000); // 1 seconds
-
-    val = 0;
-    _mappedDevice->writeReg("WORD_ADC_RESET","AD160",&val);
-    usleep(1000000); // 1 seconds
-
-    val = 1;
-    _mappedDevice->writeReg("WORD_ADC_ENA","AD160",&val);
-
-    // set open flag
+    // set open flag. Needs to be done before initialisation, as we are using some functions testing this flag in the
+    // initialisation sequence
     _isOpen = true;
 
+    // Initialise device. Procedure taken from Matlab code "ad16_init.m" by Lukasz Butkowski
+
+    // send reset
+    _mappedDevice->getRegisterAccessor("WORD_RESET_N","BOARD0")->write(1);
+    _mappedDevice->getRegisterAccessor("WORD_AD16_ENA","AD160")->write(0);
+
+    // read clock frequency
+    _mappedDevice->getRegisterAccessor("WORD_CLK_FREQ","AD160")->read(clock_frequency, 2);
+
+    // set default sampling frequency to 100kHz and oversampling ratio of 2
+    setSamplingRate(100000, RATIO_2);
+
+    // set default voltage range
+    setVoltageRange(RANGE_10Vpp);
+
+    // enable the module
+    _mappedDevice->getRegisterAccessor("WORD_AD16_ENA","AD160")->write(1);
+
+    // initialise frequency dividers for triggers with default values
+    int32_t timing_freq[_numberOfTriggers] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    _mappedDevice->getRegisterAccessor("WORD_TIMING_FREQ","APP0")->write(timing_freq,_numberOfTriggers);
+
+    // disable all internal triggers
+    _mappedDevice->getRegisterAccessor("WORD_TIMING_INT_ENA","APP0")->write(BOOST_BINARY(0));
+
+    // select trigger for starting a new block (trigger 8, which is the user trigger)
+    _mappedDevice->getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(8);
+
+    // disable the DAQ (probably unnecessary, as it should be disabled after reset)
+    //_mappedDevice->getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(0);
+
+    // select source of strobe (= trigger of a single sample) in DAQ
+    // note that the DAQ might run asynchronously with the ADCs, depending on this setting.
+    // 0-ADCA done, 1-ADC2 done , 2-trigger[6](counting from 0)
+    _mappedDevice->getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);
+
+    // reset all FSM after configuration
+    _mappedDevice->getRegisterAccessor("WORD_RESET_N","BOARD0")->write(0);
+    _mappedDevice->getRegisterAccessor("WORD_RESET_N","BOARD0")->write(1);
+
+    // read current buffer to have the local variable in sync with the hardware
+    _mappedDevice->getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&_currentBuffer);
   }
 
   /*************************************************************************************************/
   void ad16::close() {
+
+    // check if opened
     if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
+
+    // close device
     _mappedDevice->closeDev();
     _isOpen = false;
   }
 
   /*************************************************************************************************/
-  void ad16::setMode(int mode) {
-    (void)mode;
-    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
-    throw ad16Exception("Trigger mode cannot be changed currently",ad16Exception::NOT_IMPLEMENTED);
-    //_mode = mode;
-    //_mappedDevice.writeReg("MODE", "AD16", &mode);
-  }
-
-  /*************************************************************************************************/
-  void ad16::setSamplingRate(int divisor) {
-    (void)divisor;
-    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
-    throw ad16Exception("Sample rate cannot be changed in current firmware",ad16Exception::NOT_IMPLEMENTED);
-    //_mappedDevice.writeReg("SAMPLING_RATE_DIV", "AD16", &divisor);
-  }
-
-  /*************************************************************************************************/
-  void ad16::setSamplesPerBlock(int samples) {
-    (void)samples;
-    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
-    throw ad16Exception("Samples per block cannot be changed in current firmware",ad16Exception::NOT_IMPLEMENTED);
-    //_samplesPerBlock = samples;
-    //_mappedDevice.writeReg("SAMPLES_PER_BLOCK", "AD16", &samples);
-  }
-
-  /*************************************************************************************************/
-  void ad16::startConversion() {
+  void ad16::setSamplingRate(float rate, oversampling oversampling) {
 
     // check if opened
     if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
 
-    // check if conversion is already running
-    if(!conversionComplete()) {
-      throw ad16Exception("Conversion already running",ad16Exception::CONVERSION_RUNNING);
+    // check if rate exceeds specification
+    if(rate > 100000.) throw ad16Exception("Sampling rate set too high.",ad16Exception::IMPOSSIBLE_TIMING_CONFIGURATION);
+
+    // compute timing dividers and actual adc frequencies
+    int tdiv = (clock_frequency[0]/rate)-1.;
+    _samplingFrequency = clock_frequency[0]/(tdiv+1);
+
+    // select correct read mode
+    int32_t readMode = 1;
+    double tcycle = 1./_samplingFrequency * 1.e6;
+    double tread = 74./clock_frequency[1] * 1.e6;
+    double tconv = _conversionTimes[oversampling];
+    double tdelay = 0;          // TODO
+    if(tcycle <= tdelay+tconv || tconv <= tread) {
+      readMode = 0;
+      if(tcycle <= tdelay+tconv+tread) {
+        throw ad16Exception("Impossible setting of sampling rate and/or oversampling ratio.",ad16Exception::IMPOSSIBLE_TIMING_CONFIGURATION);
+      }
     }
 
-    // save starting time
+    // set ADCA rate
+    _mappedDevice->getRegisterAccessor("WORD_ADC_A_READ_MODE","AD160")->write(readMode);
+    _mappedDevice->getRegisterAccessor("WORD_ADC_A_TIMING_DIV","AD160")->write(tdiv);
+    _mappedDevice->getRegisterAccessor("WORD_ADC_A_OVERSAMPLING","AD160")->write((int)oversampling);
+
+    // set ADCB rate
+    _mappedDevice->getRegisterAccessor("WORD_ADC_B_READ_MODE","AD160")->write(readMode);
+    _mappedDevice->getRegisterAccessor("WORD_ADC_B_TIMING_DIV","AD160")->write(tdiv);
+    _mappedDevice->getRegisterAccessor("WORD_ADC_B_OVERSAMPLING","AD160")->write((int)oversampling);
+
+
+  }
+
+  /*************************************************************************************************/
+  float ad16::getSamplingRate() {
+    return _samplingFrequency;
+  }
+
+  /*************************************************************************************************/
+  void ad16::setVoltageRange(voltageRange voltageRange) {
+
+    // check if opened
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
+
+    // set ADCA range
+    int32_t val = voltageRange;
+    _mappedDevice->getRegisterAccessor("WORD_ADC_A_VOL_RANGE","AD160")->write(val);
+    _mappedDevice->getRegisterAccessor("WORD_ADC_B_VOL_RANGE","AD160")->write(val);
+  }
+
+  /*************************************************************************************************/
+  void ad16::setTriggerMode(trigger trigger, boost::any arg) {
+    if(trigger == USER) {
+
+      // disable internal trigger 8 (counting from 0) without changing the others
+      int trigs;
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_INT_ENA","APP0")->read(&trigs);
+      trigs &= 0xFF;
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_INT_ENA","APP0")->write(trigs);
+
+      // select trigger for starting a new block (trigger 8, which is the user trigger)
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(8);
+
+    }
+    else if(trigger == EXTERNAL) {
+
+      // get channel number from 2nd argument
+      int channel;
+      try {
+        channel = boost::any_cast<int>(arg);
+      }
+      catch(boost::bad_any_cast &e) {
+        throw ad16Exception("ad16::setTriggerType(): second argument missing or of wrong type for EXTERNAL trigger mode.",ad16Exception::ILLEGAL_PARAMETER);
+      }
+
+      // check if channel in range
+      if(channel < 0 || channel > 7) {
+        throw ad16Exception("Trigger channel out of range",ad16Exception::INCORRECT_TRIGGER_SETTING);
+      }
+
+      // disable internal trigger on selected channel number (and on channel 8)
+      int trigs;
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_INT_ENA","APP0")->read(&trigs);
+      trigs &= 0xFF ^ (1 << channel);
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_INT_ENA","APP0")->write(trigs);
+
+      // select trigger for starting a new block (trigger 8, which is the user trigger)
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(channel);
+
+    }
+    else if(trigger == PERIODIC) {
+
+      // get frequency from 2nd argument.
+      // We want to have some type tolerance, so we try to case to double, float and int.
+      float freq;
+      try {
+        freq = boost::any_cast<double>(arg);
+      }
+      catch(boost::bad_any_cast &e) {
+        try {
+          freq = boost::any_cast<float>(arg);
+        }
+        catch(boost::bad_any_cast &e) {
+          try {
+            freq = boost::any_cast<int>(arg);
+          }
+          catch(boost::bad_any_cast &e) {
+            throw ad16Exception("ad16::setTriggerType(): second argument missing or of wrong type for PERIODIC trigger mode.",ad16Exception::ILLEGAL_PARAMETER);
+          }
+        }
+      }
+
+      // compute frequency divider
+      int div = round(clock_frequency[0]/freq) - 1;
+
+      // update frequency divider for trigger 0
+      int32_t timing_freq[_numberOfTriggers];
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_FREQ","APP0")->read(timing_freq,_numberOfTriggers);
+      timing_freq[0] = div;
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_FREQ","APP0")->write(timing_freq,_numberOfTriggers);
+
+      // enable internal trigger 0
+      int trigs;
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_INT_ENA","APP0")->read(&trigs);
+      trigs |= 1;
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_INT_ENA","APP0")->write(trigs);
+
+      // select trigger 0
+      _mappedDevice->getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(0);
+
+    }
+
+  }
+
+  /*************************************************************************************************/
+  void ad16::enableDaq(bool enable) {
+    int32_t val = 1;
+    if(!enable) val = 0;
+    _mappedDevice->getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(val);
+  }
+
+  /*************************************************************************************************/
+  void ad16::sendUserTrigger() {
+
+    // check if opened
+    if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
+
+    // read current buffer
+    _mappedDevice->getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&_currentBuffer);
+
+    // save trigger time
     t0 = boost::posix_time::microsec_clock::local_time();
 
     // write to trigger register
-    int32_t val = 1;
-    _mappedDevice->writeReg("WORD_TIMING_USER_TRG", "APP0", &val);
-  }
+    _mappedDevice->getRegisterAccessor("WORD_TIMING_USER_TRG","APP0")->write(1);
+
+    // wait until current buffer is updated by hardware
+    int32_t currentBuffer;
+    do {
+      _mappedDevice->getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+      if(boost::posix_time::microsec_clock::local_time()-t0 > boost::posix_time::milliseconds(10)) {
+        throw ad16Exception("Timeout sending user trigger.",ad16Exception::TIMEOUT);
+      }
+    } while (currentBuffer == _currentBuffer);
+    _currentBuffer = currentBuffer;
+}
 
   /*************************************************************************************************/
   bool ad16::conversionComplete() {
@@ -148,19 +284,10 @@ namespace mtca4u{
     // check if opened
     if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
 
-    /* currently not implemented in firmware
-    if(_mode == 0 || _mode == 1) {
-      // in case of single buffering, simply check the register
-      int32_t val;
-      _mappedDevice.readReg("CONVERSION_RUNNING", "AD16", &val);
-      return (val == 0);
-    }
-    else {
-      int32_t lastBuffer;
-      _mappedDevice.readReg("LAST_BUFFER","AD16", &lastBuffer);
-      return (lastBuffer != _lastBuffer);
-    }
-    */
+    // check if current buffer was changed
+    int32_t currentBuffer;
+    _mappedDevice->getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+    return (currentBuffer != _currentBuffer);
 
     // instead check timing (assume a conversion takes 1 second at most)
     boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
@@ -175,28 +302,20 @@ namespace mtca4u{
     // check if opened
     if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
 
-    // check if conversion is still running
-    if(!conversionComplete()) {
-      throw ad16Exception("Conversion still running",ad16Exception::CONVERSION_RUNNING);
-    }
-
-    // determine last written buffer to read from
-    /* no double buffering in current firmware
-    _mappedDevice.readReg("LAST_BUFFER","AD16", &_lastBuffer);
+    // determine buffer to read from (which is not the "current" buffer the AD16 currently writes to)
+    _mappedDevice->getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&_currentBuffer);
     std::string bufferName;
-    if(_lastBuffer == 0) {
-      bufferName = "BUFFER_A";
+    if(_currentBuffer == 1) {           // hardware currently writing to buffer B
+      bufferName = "DAQ0_ADCA";
     }
-    else {
-      bufferName = "BUFFER_B";
+    else {                              // hardware currently writing to buffer A
+      bufferName = "DAQ0_ADCB";
     }
-    */
-    std::string bufferName = "DAQ0_ADCA";
 
     // modify register map so the DMA area has the right length
     for(mapFile::iterator i = _map->begin(); i != _map->end(); ++i) {
       if(i->reg_module == "APP0" && i->reg_name == "AREA_MULTIPLEXED_SEQUENCE_"+bufferName) {
-        i->reg_elem_nr = numberOfChannels*_samplesPerBlock;
+        i->reg_elem_nr = _numberOfChannels*_samplesPerBlock;
         i->reg_size = sizeof(int32_t)*i->reg_elem_nr;
       }
     }
@@ -209,10 +328,13 @@ namespace mtca4u{
   }
 
   /*************************************************************************************************/
-  std::vector<int> ad16::getChannelData(unsigned int channel) {
+  std::vector<int32_t> ad16::getChannelData(unsigned int channel) {
 
     // check if opened
     if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
+
+    // check if read() has been called already
+    if(!_dataDemuxed) throw ad16Exception("No data has been read so far. Call read() first!",ad16Exception::ILLEGAL_PARAMETER);
 
     // check if channel is in range
     if(channel >= _dataDemuxed->getNumberOfDataSequences()) {

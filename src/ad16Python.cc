@@ -10,34 +10,41 @@ using namespace boost::python;
 BOOST_PYTHON_MODULE(libad16)
 {
 
-  //class_< std::vector<int> >("VectorInt")
-     //.def(vector_indexing_suite< std::vector<int> >() );
-
   class_<ad16, boost::noncopyable>("ad16")
     .def("open",&ad16::open)
     .def("close",&ad16::close)
-    .def("setMode",&ad16::setMode)
-    .def("startConversion",&ad16::startConversion)
-    .def("conversionComplete",&ad16::conversionComplete)
     .def("setSamplingRate",&ad16::setSamplingRate)
-    .def("setSamplesPerBlock",&ad16::setSamplesPerBlock)
+    .def("getSamplingRate",&ad16::getSamplingRate)
+    .def("setVoltageRange",&ad16::setVoltageRange)
+    .def("setTriggerMode",&ad16::setTriggerModePy1)
+    .def("setTriggerMode",&ad16::setTriggerModePy2)
+    .def("setTriggerMode",&ad16::setTriggerModePy3)
+    .def("enableDaq",&ad16::enableDaq)
+    .def("sendUserTrigger",&ad16::sendUserTrigger)
+    .def("conversionComplete",&ad16::conversionComplete)
     .def("read",&ad16::read)
     .def("getChannelData",&ad16::getChannelDataNumpy)
     ;
 
-  enum_<ad16::rate>("rate")
-    .value("Hz100000",ad16::RATE_100000Hz)
-    .value("Hz50000", ad16::RATE_50000Hz)
-    .value("Hz10000", ad16::RATE_10000Hz)
-    .value("Hz5000", ad16::RATE_5000Hz)
-    .value("Hz1000", ad16::RATE_1000Hz)
+  enum_<ad16::oversampling>("oversampling")
+    .value("NO_OVERSAMPLING",ad16::NO_OVERSAMPLING)
+    .value("RATIO_2", ad16::RATIO_2)
+    .value("RATIO_4", ad16::RATIO_4)
+    .value("RATIO_8", ad16::RATIO_8)
+    .value("RATIO_16", ad16::RATIO_16)
+    .value("RATIO_32", ad16::RATIO_32)
+    .value("RATIO_64", ad16::RATIO_64)
   ;
 
-  enum_<ad16::mode>("mode")
-    .value("SOFTWARE_TRIGGER",ad16::SOFTWARE_TRIGGER)
-    //.value("EXT_TRIGGER", ad16::EXT_TRIGGER)
-    //.value("EXT_TRIGGER_DOUBLE_BUFFER", ad16::EXT_TRIGGER_DOUBLE_BUFFER)
-    .value("AUTO_TRIGGER", ad16::AUTO_TRIGGER)
+  enum_<ad16::voltageRange>("voltageRange")
+    .value("RANGE_5Vpp",ad16::RANGE_5Vpp)
+    .value("RANGE_10Vpp", ad16::RANGE_10Vpp)
+  ;
+
+  enum_<ad16::trigger>("trigger")
+    .value("PERIODIC",ad16::PERIODIC)
+    .value("USER", ad16::USER)
+    .value("EXTERNAL", ad16::EXTERNAL)
   ;
 
   numeric::array::set_module_and_type("numpy", "ndarray");

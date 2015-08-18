@@ -76,12 +76,11 @@ class MainWindow(QtGui.QMainWindow):
         
         self.grid.addWidget(QtGui.QLabel('Sampling rate:'),3,0)
         self.samplingRate = QtGui.QComboBox()
-        #self.samplingRate.addItem("100 kHz", libad16.rate.Hz100000)
-        #self.samplingRate.addItem("50 kHz", libad16.rate.Hz50000)
-        #self.samplingRate.addItem("10 kHz", libad16.rate.Hz10000)
-        #self.samplingRate.addItem("5 kHz", libad16.rate.Hz5000)
-        #self.samplingRate.addItem("1 kHz", libad16.rate.Hz1000)
-        self.samplingRate.addItem("79.1 kHz", libad16.rate.Hz100000)
+        self.samplingRate.addItem("100 kHz", 100000)
+        self.samplingRate.addItem("50 kHz", 50000)
+        self.samplingRate.addItem("10 kHz", 10000)
+        self.samplingRate.addItem("5 kHz", 5000)
+        self.samplingRate.addItem("1 kHz", 1000)
         self.grid.addWidget(self.samplingRate,3,1,1,3)
         
         self.grid.addWidget(QtGui.QLabel('Number of samples per channel:'),4,0)
@@ -189,11 +188,10 @@ class MainWindow(QtGui.QMainWindow):
         # open AD16 and start first conversion
         self.ad16 = libad16.ad16()
         if os.path.exists('/dev/llrfutcs5'):
-            self.ad16.open("/dev/llrfutcs5","ad16dummy.map")
+            self.ad16.open("/dev/llrfutcs5","ad16_scope_fmc25_r1224.mapp")
         else:
-            self.ad16.open("ad16dummy.map","ad16dummy.map")
-        #self.ad16.setMode(libad16.mode.SOFTWARE_TRIGGER)
-        #self.ad16.startConversion()
+            self.ad16.open("ad16_scope_fmc25_r1224.mapp","ad16_scope_fmc25_r1224.mapp")
+        self.ad16.setTriggerMode(libad16.trigger.PERIODIC,1)
         
         # start the automatic update
         self.start_time = time.time()
@@ -208,9 +206,10 @@ class MainWindow(QtGui.QMainWindow):
         if self.DAQrunning == 0:
             self.startStopButton.setText('Stop')
             self.DAQrunning = 1
-            self.ad16.startConversion()
+            self.ad16.enableDaq(True);
         else:
             self.startStopButton.setText('Start')
+            self.ad16.enableDaq(False);
             self.DAQrunning = 0
     
     def clickToggleChannels(self):
@@ -417,9 +416,6 @@ class MainWindow(QtGui.QMainWindow):
 
         # compute x-axis values
         self.times = np.linspace(0., TIME_STEP*float(NUMBER_OF_SAMPLES), num=NUMBER_OF_SAMPLES, endpoint=False)
-        
-        # trigger next conversion
-        self.ad16.startConversion()
         
         # take time for obtaining the data
         time_get_image = time.time()

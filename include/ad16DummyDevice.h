@@ -18,8 +18,8 @@ namespace mtca4u{
   {
     public:
 
-      ad16DummyDevice() : isOpened(false),isConversionRunning(false),currentPosition(0) {}
-      virtual ~ad16DummyDevice() {}
+      ad16DummyDevice();
+      virtual ~ad16DummyDevice();
 
       virtual void openDev(const std::string &mappingFileName, int perm=O_RDWR, devConfigBase *pConfig=NULL);
 
@@ -30,29 +30,58 @@ namespace mtca4u{
       /// flag if the device is currently open or not
       bool isOpened;
 
-      /// callback writing to the START_CONVERSION register
-      void callbackStartConversion();
+      /// callback writing to WORD_DAQ_ENABLE
+      void callbackDaqEnable();
 
-      /// thread function to simulate the time needed for the conversion
-      void threadConversion();
+      /// setup callback for configuration retoster
+      void setupCallback(std::string registerName, boost::function<void()> cb);
+
+      /// thread function to simulate the DAQ and its timing
+      void threadDaq();
+
+      /// boost thread object for threadDaq()
+      boost::thread theThread;
 
       /// random number generator to fill channels with white noise
       boost::mt11213b rng;
 
-      /// thread used to simulate conversion timing
-      boost::thread theThread;
+      /// flag if a DAQ is currently running (to prevent starting multiple DAQ threads)
+      volatile bool isDaqRunning;
 
-      /// flag if a conversion is currently running (to prevent starting multiple conversions)
-      volatile bool isConversionRunning;
-
-      /// possible operation modes
-      enum mode { SOFTWARE_TRIGGER=8, AUTO_TRIGGER=0 };
+      /// possible DAQ strobe sources
+      enum mode { DAQ_STROBE_ADCA=0, DAQ_STROBE_ADCB=1, DAQ_STROBE_TRIGGER6=2 };
 
       /// current write position in buffer
       int32_t currentPosition;
 
-      /// number of channels
+      /// current buffer to write to
+      int32_t currentBuffer;
+
+      /// current ADC sample buffer (before DAQ)
+      std::vector<int32_t> ADCvalA, ADCvalB;
+
+      /// number of channels. Must be a factor of 2 (since we have 2 chips) and is essentially fixed at 16. Don't expect
+      /// things to work out-of-the-box if this number is changed.
       const static int32_t numberOfChannels;
+
+      /// number of samples per buffer and channel
+      const static int32_t numberOfSamples;
+
+      /// ADC clock frequency in Hz (-> WORD_CLK_FREQ[0])
+      /// Defaults to 50 MHz but can be changed by the tests to make sure the library works with any frequency. It must
+      /// be changed before the call to openDev() happens to be written to the register correctly!
+      int32_t clockFrequency;
+
+      /// SPI clock frequency in Hz (-> WORD_CLK_FREQ[1])
+      /// Defaults to 50 MHz but can be changed by the tests to make sure the library works with any frequency. It must
+      /// be changed before the call to openDev() happens to be written to the register correctly!
+      int32_t spiFrequency;
+
+      /// some test value to be written to the 3rd channel
+      int32_t testValue;
+
+      /// trigger counter, will be written into the 4th channel
+      int32_t triggerCounter;
 
   };
 

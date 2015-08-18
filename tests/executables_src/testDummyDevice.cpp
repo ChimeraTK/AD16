@@ -1,5 +1,4 @@
 #include <boost/test/included/unit_test.hpp>
-using namespace boost::unit_test_framework;
 #include <boost/lambda/lambda.hpp>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
@@ -8,9 +7,11 @@ using namespace boost::unit_test_framework;
 
 #include "ad16DummyDevice.h"
 #include <MtcaMappedDevice/devMap.h>
+
+using namespace boost::unit_test_framework;
 using namespace mtca4u;
 
-#define TEST_MAPPING_FILE "ad16dummy.map"
+#define TEST_MAPPING_FILE "ad16_scope_fmc25_r1224.mapp"
 
 /**********************************************************************************************************************/
 // forward declaration so we can declare it friend
@@ -36,21 +37,25 @@ class DummyDeviceTest {
 
     void testExceptions();
     void testSoftwareTriggeredMode();
-    //void testSampleRate();
-    //void testAutoTriggerMode();
+    void testAutoTriggerMode();
+    void testTriggerRates();
 
   private:
     //TestableDummyDevice _dummyDevice;
     boost::shared_ptr<TestableDummyDevice> _dummyDevice;
     devMap<devBase> _dummyMapped;
-    void freshlyOpenDevice();
+    void openDevice();
     friend class DummyDeviceTestSuite;
 
-    // helper routine for testSampleRate(), returns milliseconds the conversion took
+    // helper function for testTriggerRates() to test with a single trigger rate
+    // the rateDiv argiment is the trigger rate divider with the usual AD16 definition
+    void testSingleTriggerRate(int rateDiv);
+
+    /*    // helper routine for testTriggerRate(), returns milliseconds the conversion took
     // nSamples and fDiv are the number of samples and the sample rate divisor
     // msOffset is the calibration offset to be subtracted from the measured time. -1 will disable comparing the time
     // to the expectation (used to measure the offset)
-    //int measureConversionTime(int nSamples, int fDiv, int msOffset=-1);
+    int measureTriggerTiming(int nSamples, int fDiv, int msOffset=-1); */
 
 };
 
@@ -62,7 +67,8 @@ class  DummyDeviceTestSuite : public test_suite {
 
       add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testExceptions, dummyDeviceTest ) );
       add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testSoftwareTriggeredMode, dummyDeviceTest ) );
-      //add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testSampleRate, dummyDeviceTest ) );
+      add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testAutoTriggerMode, dummyDeviceTest ) );
+      add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testTriggerRates, dummyDeviceTest ) );
     }};
 
 /**********************************************************************************************************************/
@@ -75,22 +81,15 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/ [] )
 }
 
 /**********************************************************************************************************************/
-void DummyDeviceTest::freshlyOpenDevice() {
-  try{
-    _dummyDevice->openDev(TEST_MAPPING_FILE);
-    _dummyMapped.openDev( _dummyDevice, _dummyDevice->_registerMapping);
-  }
-  catch(DummyDeviceException &) {
-    // make sure the device was freshly opened, so
-    // registers are set to 0.
-    _dummyMapped.closeDev();
-    _dummyDevice->openDev(TEST_MAPPING_FILE);
-    _dummyMapped.openDev( _dummyDevice, _dummyDevice->_registerMapping);
-  }
+void DummyDeviceTest::openDevice() {
+  _dummyDevice->openDev(TEST_MAPPING_FILE);
+  _dummyMapped.openDev( _dummyDevice, _dummyDevice->_registerMapping);
 }
 
 /**********************************************************************************************************************/
 void DummyDeviceTest::testExceptions() {
+  std::cout << "testExceptions" << std::endl;
+
   // close the not opened device
   BOOST_CHECK_THROW( _dummyDevice->closeDev(), DummyDeviceException);
   try {
@@ -116,76 +115,200 @@ void DummyDeviceTest::testExceptions() {
 
 /**********************************************************************************************************************/
 void DummyDeviceTest::testSoftwareTriggeredMode() {
-  int32_t val;
-  freshlyOpenDevice();
+  std::cout << "testSoftwareTriggeredMode" << std::endl;
+  openDevice();
 
-  // set trigger to user trigger
-  val = 8;
-  _dummyMapped.writeReg("WORD_TIMING_TRG_SEL", "APP0", &val);
+  // set test value of dummy device (to have something changing between the tests). Will be the content of the 3rd channel
+  _dummyDevice->testValue = 1;
 
-  // start conversion
-  val = 1;
-  _dummyMapped.writeReg("WORD_TIMING_USER_TRG", "APP0", &val);
+  // select ADCA ready as DAQ strobe
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
 
-  // number of samples is currently fixed
-  int32_t nSamples = 1024;
+  // enable software trigger
+  _dummyMapped.getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(8);
 
-  // wait until conversion is complete
-  /* no synchronisation possible with current firmware...
-  while(val == 1) {
-    _dummyMapped.readReg("CONVERSION_RUNNING", "AD16", &val);
-    usleep(1);
-  }
-  */
+  // enable DAQ
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
+
+  // obtain last buffer
+  int lastBuffer;
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
+
+  // send user trigger
+  _dummyMapped.getRegisterAccessor("WORD_TIMING_USER_TRG","APP0")->write(1);
+
+  // wait for 1 second
   usleep(1000000);
 
   // create accessor for multiplexed data
-  boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed =
-      _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
+  boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
+  if(lastBuffer == 1) {
+    dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
+  }
+  else {
+    dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCB", "APP0");
+  }
   dataDemuxed->read();
 
   // Return the number of sequences found: should be 16
   uint numberOfDataSequences = dataDemuxed->getNumberOfDataSequences();
-  std::cout << "Number Of dataSequences extracted: " << numberOfDataSequences << std::endl;
+  BOOST_CHECK( numberOfDataSequences == 16 );
 
   // The accessor expects that all sequences are of the same length, and that a
   // described region should have at least one sequence.
-  uint lengthOfaSequence = (*dataDemuxed)[0].size();
-  std::cout << "Length of each sequence: " << lengthOfaSequence << std::endl;
+  int lengthOfaSequence = (*dataDemuxed)[0].size();
+  BOOST_CHECK( lengthOfaSequence == 65536 );
 
-  // check data: first sequence should contain sample number as values
-  for (int columnCount = 0; columnCount < nSamples; ++columnCount) {
-    //std::cout << "row 0 column " << columnCount << " " << (*dataDemuxed)[0][columnCount] << std::endl;
-    BOOST_CHECK( (*dataDemuxed)[0][columnCount] == columnCount );
+  // check data
+  for(int iSample = 0; iSample < lengthOfaSequence; ++iSample) {
+    BOOST_CHECK( (*dataDemuxed)[1][iSample] == iSample );
+    BOOST_CHECK( (*dataDemuxed)[2][iSample] == 1 );             // this is our test value set above
   }
-  // This check would only make sense if the buffer were larger than the written data. This is currently not the case
-  // as the number of samples is fixed.
-  //BOOST_CHECK( (*dataDemuxed)[0][nSamples] == 0 );
+
+  _dummyMapped.closeDev();
+}
+/**********************************************************************************************************************/
+void DummyDeviceTest::testAutoTriggerMode() {
+  std::cout << "testAutoTriggerMode" << std::endl;
+  openDevice();
+
+  // set test value of dummy device (to have something changing between the tests). Will be the content of the 3rd channel
+  _dummyDevice->testValue = 2;
+
+  // select ADCA ready as DAQ strobe
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
+
+  // enable trigger 0 and set it to 1 Hz
+  _dummyMapped.getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(0);
+  _dummyMapped.getRegisterAccessor("WORD_TIMING_FREQ","APP0")->write(49999999);
+
+  // obtain current buffer
+  int lastBuffer;
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
+
+  // enable DAQ
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
+
+  // wait until conversion is complete
+  int currentBuffer;
+  do {
+    _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+    usleep(1);
+  } while(currentBuffer == lastBuffer);
+
+  // create accessor for multiplexed data
+  boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
+  if(currentBuffer == 1) {
+    dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
+  }
+  else {
+    dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCB", "APP0");
+  }
+  dataDemuxed->read();
+
+  // The accessor expects that all sequences are of the same length, and that a
+  // described region should have at least one sequence.
+  int lengthOfaSequence = (*dataDemuxed)[0].size();
+
+  // check data:
+  for(int iSample = 0; iSample < lengthOfaSequence; ++iSample) {
+    BOOST_CHECK( (*dataDemuxed)[1][iSample] == iSample );
+    BOOST_CHECK( (*dataDemuxed)[2][iSample] == 2 );             // this is our test value set above
+  }
+
+  _dummyMapped.closeDev();
+}
+
+/**********************************************************************************************************************/
+void DummyDeviceTest::testTriggerRates() {
+  testSingleTriggerRate(49999999);      // 1 sec
+  testSingleTriggerRate(74999999);      // 1.5 sec
+}
+
+/**********************************************************************************************************************/
+void DummyDeviceTest::testSingleTriggerRate(int rateDiv) {
+  std::cout << "testSingleTriggerRate(" << rateDiv << ")" << std::endl;
+  openDevice();
+
+  // set test value of dummy device (to have something changing between the tests). Will be the content of the 3rd channel
+  _dummyDevice->testValue = 3;
+
+  // select ADCA ready as DAQ strobe
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
+
+  // enable trigger 0 and set it to 1 Hz
+  _dummyMapped.getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(0);
+  _dummyMapped.getRegisterAccessor("WORD_TIMING_FREQ","APP0")->write(rateDiv);
+
+  // obtain current buffer
+  int lastBuffer;
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
+
+  // enable DAQ
+  _dummyMapped.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
+
+  // measure time between each trigger (for 3 triggers, to have some statistics)
+  // for each trigger, the recorded data will be checked if correct
+  boost::posix_time::ptime t0(boost::posix_time::microsec_clock::local_time());         // start time
+  std::vector<boost::posix_time::time_duration> triggerTimes;
+
+  std::cout << "Triggers: " << std::flush;
+  for(int i=0; i<3; i++) {
+    // wait until conversion is complete
+    int currentBuffer;
+    do {
+      _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+      usleep(1);
+    } while(currentBuffer == lastBuffer);
+    lastBuffer = currentBuffer;
+
+    std::cout << "." << std::flush;
+
+    // measure time
+    boost::posix_time::ptime t1(boost::posix_time::microsec_clock::local_time());
+    triggerTimes.push_back(t1-t0);
+    t0 = t1;
+
+    // create accessor for multiplexed data
+    boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
+    if(currentBuffer == 1) {
+      dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
+    }
+    else {
+      dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCB", "APP0");
+    }
+    dataDemuxed->read();
+
+    // check data
+    int lengthOfaSequence = (*dataDemuxed)[0].size();
+    for(int iSample = 0; iSample < lengthOfaSequence; ++iSample) {
+      BOOST_CHECK( (*dataDemuxed)[1][iSample] == iSample );
+      BOOST_CHECK( (*dataDemuxed)[2][iSample] == 3 );             // this is our test value set above
+      BOOST_CHECK( (*dataDemuxed)[3][iSample] == i );             // this is the trigger counter
+    }
+  }
+  std::cout << std::endl;
+
+  // compute average and rms of trigger times
+  double mean = 0;      // in miliseconds
+  double rms = 0;
+  for(unsigned int i=0; i<triggerTimes.size(); i++) mean += triggerTimes[i].total_microseconds()/1000.;
+  mean /= triggerTimes.size();
+  for(unsigned int i=0; i<triggerTimes.size(); i++) rms += pow(triggerTimes[i].total_microseconds()/1000. - mean,2);
+  rms = sqrt(rms)/triggerTimes.size();
+
+  std::cout << "Mean = " << mean << "   RMS = " << rms << std::endl;
+
+  double expectedMean = (rateDiv+1) / 50000.;
+  BOOST_CHECK( mean > expectedMean/1.001 && mean < expectedMean*1.001 );
+  BOOST_CHECK( rms < 1. );
+
+  _dummyMapped.closeDev();
 }
 
 /**********************************************************************************************************************/
 /*
-void DummyDeviceTest::testSampleRate() {
-  int32_t val;
-  freshlyOpenDevice();
-
-  // set mode
-  val = 0;
-  _dummyMapped.writeReg("MODE", "AD16", &val);
-
-  // measure offset (1000 samples at 100kHz should take 10ms)
-  int msOffset = measureConversionTime(1000,1) - 10.;
-
-  // test various sample rates
-  measureConversionTime(1000,2,msOffset);
-  measureConversionTime(1000,10,msOffset);
-  measureConversionTime(1000,5,msOffset);
-  measureConversionTime(1000,100,msOffset);
-}
-*/
-/**********************************************************************************************************************/
-/*
-int DummyDeviceTest::measureConversionTime(int nSamples, int fDiv, int msOffset) {
+int DummyDeviceTest::measureTriggerTiming(int nSamples, int fDiv, int msOffset) {
   // set number of samples per block and channel
   _dummyMapped.writeReg("SAMPLES_PER_BLOCK", "AD16", &nSamples);
 
@@ -224,53 +347,4 @@ int DummyDeviceTest::measureConversionTime(int nSamples, int fDiv, int msOffset)
   return ms;
 
 }
-*/
-/**********************************************************************************************************************/
-/*
-void DummyDeviceTest::testAutoTriggerMode() {
-  int32_t val;
-  freshlyOpenDevice();
-
-  // set mode
-  val = 0;
-  _dummyMapped.writeReg("WORD_TIMING_TRG_SEL", "APP0", &val);
-
-  // set number of samples per block
-  int nSamples = 8;
-  _dummyMapped.writeReg("SAMPLES_PER_BLOCK", "AD16", &nSamples);
-
-  // read the current "last buffer"
-  int lastBuffer;
-  _dummyMapped.readReg("LAST_BUFFER", "AD16", &lastBuffer);
-
-  // start conversion
-  val = 1;
-  _dummyMapped.writeReg("CONVERSION_RUNNING", "AD16", &val);
-
-  // wait until conversion is complete
-  while(val != lastBuffer) {
-    _dummyMapped.readReg("LAST_BUFFER", "AD16", &val);
-    usleep(1);
-  }
-
-  // create accessor for multiplexed data
-  boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed =
-      _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("BUFFER_A", "AD16");
-  dataDemuxed->read();
-
-  // Return the number of sequences found: should be 16
-  uint numberOfDataSequences = dataDemuxed->getNumberOfDataSequences();
-  std::cout << "Number Of dataSequences extracted: " << numberOfDataSequences << std::endl;
-
-  // The accessor expects that all sequences are of the same length, and that a
-  // described region should have at least one sequence.
-  uint lengthOfaSequence = (*dataDemuxed)[0].size();
-  std::cout << "Length of each sequence: " << lengthOfaSequence << std::endl;
-  // check data: first sequence should contain sample number as values
-  for (int columnCount = 0; columnCount < nSamples; ++columnCount) {
-//    std::cout << "row 0 column " << columnCount << " " << (*dataDemuxed)[0][columnCount] << std::endl;
-    BOOST_CHECK( (*dataDemuxed)[0][columnCount] == columnCount );
-  }
-  BOOST_CHECK( (*dataDemuxed)[0][nSamples] == 0 );
-}
-*/
+ */

@@ -12,7 +12,8 @@ namespace mtca4u
 
       /** The different error types of the ad16Exception.
        */
-      enum { NOT_OPENED, ALREADY_OPENED, ILLEGAL_PARAMETER, CHANNEL_OUT_OF_RANGE, CONVERSION_RUNNING, NOT_IMPLEMENTED };
+      enum { NOT_OPENED, ALREADY_OPENED, ILLEGAL_PARAMETER, ILLEGAL_OVERSAMPLING_RATIO, CHANNEL_OUT_OF_RANGE,
+            IMPOSSIBLE_TIMING_CONFIGURATION, INCORRECT_TRIGGER_SETTING, NOT_IMPLEMENTED, TIMEOUT };
 
       ad16Exception(const std::string & message, unsigned int id):
         exBase(message, id) {}
