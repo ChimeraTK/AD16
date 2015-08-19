@@ -16,7 +16,7 @@ import numpy as np
 
 # GUI is QT
 from PyQt4.QtGui import QFileDialog
-from PyQt4.Qt import QMessageBox
+from PyQt4.Qt import QMessageBox, QDir
 from pyqtgraph.Qt import QtCore, QtGui
 
 # plotting is done with PyQtGraph
@@ -289,6 +289,7 @@ class MainWindow(QtGui.QMainWindow):
         dlg.setWindowTitle('Open AD16 device')
         dlg.setViewMode( QtGui.QFileDialog.Detail )
         dlg.setDirectory("/dev")
+        dlg.setFilter(QDir.System | QDir.Dirs)
         dlg.setNameFilters( [self.tr('Device Files (*)')] )
         
         # show dialog, open only if user did not cancel
