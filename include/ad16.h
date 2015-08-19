@@ -56,9 +56,11 @@ namespace mtca4u{
       /// Select trigger mode. The meanung of the second argument depends on the selected trigger type. The PERIODIC
       /// trigger takes a float argument with the trigger frequency in Hz. The EXTERNAL trigger takes a int argument
       /// with the trigger input channel between 0 and 7. USER has no additional argument.
+      /// Design note: We are using boost::any instead of classic overloads, since overloading int and float arguments
+      /// will result in an ambiguous call.
       void setTriggerMode(trigger trigger, boost::any arg=boost::any());
 
-      /// these are for the python bindings only
+      /// These functions are for the python bindings only (boost::any does not easily work from Python)
       void setTriggerModePy1(trigger trigger)
       {
         setTriggerMode(trigger);
@@ -73,11 +75,15 @@ namespace mtca4u{
       }
 
       /// Enable (or disable) the DAQ. When the device is freshly opened, the DAQ is disabled. While the DAQ has been
-      /// enabled, data will be read from the ADC chips and written to the buffers.
+      /// enabled, data will be read from the ADC chips and written to the buffers. Even in user trigger mode, there is
+      /// no need to send a trigger right after the DAQ has been enabled, as data taking will start immediately.
       void enableDaq(bool enable=true);
 
       /// Send a user trigger (if USER trigger type was selected). This function will block until the trigger was
       /// acknowledged by the hardware, with a timeout of 10ms, which will throw an ad16Exception::TIMEOUT
+      /// Note: the effect of the trigger will be to swap the buffers and start filling the new buffer. Since read()
+      /// will always read the currently inactive buffer, one must send a trigger right before reading the data to get
+      /// the data taken after the previous trigger.
       void sendUserTrigger();
 
       /// Tests if conversion is complete (returns true) or currently running (returns false)

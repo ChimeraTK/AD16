@@ -334,7 +334,7 @@ namespace mtca4u{
     if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
 
     // check if read() has been called already
-    if(!_dataDemuxed) throw ad16Exception("No data has been read so far. Call read() first!",ad16Exception::ILLEGAL_PARAMETER);
+    if(!_dataDemuxed) throw ad16Exception("No data has been read so far. Call read() first!",ad16Exception::NO_DATA_AVAILABLE);
 
     // check if channel is in range
     if(channel >= _dataDemuxed->getNumberOfDataSequences()) {

@@ -12,8 +12,16 @@ namespace mtca4u
 
       /** The different error types of the ad16Exception.
        */
-      enum { NOT_OPENED, ALREADY_OPENED, ILLEGAL_PARAMETER, ILLEGAL_OVERSAMPLING_RATIO, CHANNEL_OUT_OF_RANGE,
-            IMPOSSIBLE_TIMING_CONFIGURATION, INCORRECT_TRIGGER_SETTING, NOT_IMPLEMENTED, TIMEOUT };
+      enum exceptionId {
+        NOT_OPENED,                             // function called which required the device to be opened before it has been opened
+        ALREADY_OPENED,                         // tried to open device twice
+        NO_DATA_AVAILABLE,                      // data has been requested before transfer from hardware was performed
+        ILLEGAL_PARAMETER,                      // wrong type of parameter given
+        CHANNEL_OUT_OF_RANGE,                   // given channel number out of range
+        IMPOSSIBLE_TIMING_CONFIGURATION,        // sampling frequency, oversampling etc. chosen in an impossible way
+        INCORRECT_TRIGGER_SETTING,              // trigger setting is not possible (e.g. trigger channel out of range)
+        TIMEOUT                                 // timout during hardware communication
+      };
 
       ad16Exception(const std::string & message, unsigned int id):
         exBase(message, id) {}
