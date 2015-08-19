@@ -15,8 +15,8 @@ import datetime
 import numpy as np
 
 # GUI is QT
-from PyQt4.QtGui import QFileDialog
-from PyQt4.Qt import QMessageBox, QDir
+from PyQt4.QtGui import QFileDialog, QInputDialog
+from PyQt4.Qt import QMessageBox, QDir, QComboBox, QStringList
 from pyqtgraph.Qt import QtCore, QtGui
 
 # plotting is done with PyQtGraph
@@ -222,11 +222,8 @@ class MainWindow(QtGui.QMainWindow):
 # create the menu
     def makeMenu(self):
 
-        self._realDeviceAction = QtGui.QAction("Open &real device...", None)
-        self.connect(self._realDeviceAction, QtCore.SIGNAL('triggered()'), self.openRealDevice)
-
-        self._dummyDeviceAction = QtGui.QAction("Open &dummy device", None)
-        self.connect(self._dummyDeviceAction, QtCore.SIGNAL('triggered()'), self.openDummyDevice)
+        self._deviceOpenAction = QtGui.QAction("&Open device...", None)
+        self.connect(self._deviceOpenAction, QtCore.SIGNAL('triggered()'), self.openDevice)
 
         self._closeDeviceAction = QtGui.QAction("&Close device", None)
         self.connect(self._closeDeviceAction, QtCore.SIGNAL('triggered()'), self.closeDevice)
@@ -248,8 +245,7 @@ class MainWindow(QtGui.QMainWindow):
         
         menuBar = self.menuBar()
         fileMenu = menuBar.addMenu("&File")
-        fileMenu.addAction(self._realDeviceAction)
-        fileMenu.addAction(self._dummyDeviceAction)
+        fileMenu.addAction(self._deviceOpenAction)
         fileMenu.addAction(self._closeDeviceAction)
         fileMenu.addAction(self._saveAction)
         fileMenu.addAction(self._saveMeasurementsAction)
@@ -260,25 +256,8 @@ class MainWindow(QtGui.QMainWindow):
         helpMenu.addAction(self._helpAction)
 
 #######################################################################################################################
-# open dummy device (from menu)
-    def openDummyDevice(self):
-        
-        if self.ad16 != None:
-            QtGui.QMessageBox.information(self, 'Error', 'Device already open. Close first!')
-        
-        # open AD16 dummy device
-        myad16 = libad16.ad16()
-        myad16.open("ad16_scope_fmc25_r1224.mapp","ad16_scope_fmc25_r1224.mapp")
-        myad16.setTriggerMode(libad16.trigger.PERIODIC,1)
-        self.ad16 = myad16
-        
-        # update start button
-        self.startStopButton.setText("Start")
-        self.startStopButton.setEnabled(True)
-
-#######################################################################################################################
 # open real device (from menu)
-    def openRealDevice(self):
+    def openDevice(self):
         
         if self.ad16 != None:
             QtGui.QMessageBox.information(self, 'Error', 'Device already open. Close first!')
@@ -286,26 +265,39 @@ class MainWindow(QtGui.QMainWindow):
         # create open device dialog
         dlg = QFileDialog(self)
         dlg.setAcceptMode(QFileDialog.AcceptOpen)
-        dlg.setWindowTitle('Open AD16 device')
+        dlg.setWindowTitle('Open DMAP file')
         dlg.setViewMode( QtGui.QFileDialog.Detail )
-        dlg.setDirectory("/dev")
-        dlg.setFilter(QDir.System | QDir.Dirs)
-        dlg.setNameFilters( [self.tr('Device Files (*)')] )
+        dlg.setNameFilters( ['DMAP Files (*.dmap)', 'All Files (*)'] )
+        dlg.setDefaultSuffix('dmap')
         
         # show dialog, open only if user did not cancel
         if dlg.exec_() :
             # file name must be converted into standard python string
             name = str(dlg.selectedFiles()[0])
-        
-            # open AD16 real device
-            myad16 = libad16.ad16()
-            try:
-                myad16.open(name,"ad16_scope_fmc25_r1224.mapp")
-            except:
-                QtGui.QMessageBox.information(self, 'Error', 'Device cannot be opened.')
-                return
-            myad16.setTriggerMode(libad16.trigger.PERIODIC,1)
-            self.ad16 = myad16
+            
+            # open file and extract entries
+            devNames = QStringList()
+            f = open(name,'r')
+            for line in f:
+                x = line.split(' ',1)
+                devNames.append(x[0])
+            
+            # create dialog to choose the right device
+            devName = QInputDialog.getItem(self, 'Open device in DMAP file', 'Device:', devNames,0,False)
+
+            # open AD16 device
+            if(devName[1]) :
+                myad16 = libad16.ad16()
+                try:
+                    myad16.openDmap(name,str(devName[0]))
+                except libad16.ad16Exception, e:
+                    QtGui.QMessageBox.information(self, 'Error', e.what)
+                    return
+                except:
+                    QtGui.QMessageBox.information(self, 'Error', 'Device cannot be opened.')
+                    return
+                myad16.setTriggerMode(libad16.trigger.PERIODIC,1)
+                self.ad16 = myad16
         
             # update start button
             self.startStopButton.setText("Start")

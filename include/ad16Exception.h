@@ -15,6 +15,7 @@ namespace mtca4u
       enum exceptionId {
         NOT_OPENED,                             // function called which required the device to be opened before it has been opened
         ALREADY_OPENED,                         // tried to open device twice
+        CANNOT_OPEN,                            // cannot open the device
         NO_DATA_AVAILABLE,                      // data has been requested before transfer from hardware was performed
         ILLEGAL_PARAMETER,                      // wrong type of parameter given
         CHANNEL_OUT_OF_RANGE,                   // given channel number out of range

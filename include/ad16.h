@@ -21,7 +21,13 @@ namespace mtca4u{
       ad16() : _isOpen(false), _mode(0), _currentBuffer(-1), _samplingFrequency(-1) {};
       ~ad16() {};
 
-      /// Open AD16 device. Currently only a dummy device can be opened. The dummy device is selected by setting both arguments to the mapping file name.
+      /// Open AD16 device through a DMAP file
+      /// deviceAlias is the alias name of the AD16 to open inside the dmap file.
+      void openDmap(const std::string &dmapFileName, const std::string &deviceAlias);
+
+      /// Open AD16 device by specifying the device and mapping file names
+      /// If the deviceFileName and the mappingFileName both contain the mappingFileName, a dummy device based on that
+      /// mapping file will be created.
       void open(const std::string &deviceFileName, const std::string &mappingFileName);
 
       /// Close AD16 device.

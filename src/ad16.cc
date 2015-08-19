@@ -3,16 +3,36 @@
 #include <MtcaMappedDevice/DummyDevice.h>
 #include <MtcaMappedDevice/mapFileParser.h>
 #include <MtcaMappedDevice/mapFile.h>
+#include <MtcaMappedDevice/dmapFile.h>
+#include <MtcaMappedDevice/exlibmap.h>
 #include <mtca4upy/HelperFunctions.h>
 #include <cstring>
 
-namespace mtca4u{
+namespace mtca4u {
 
   // initialise constants
   const int32_t ad16::_numberOfChannels = 16;
   const int32_t ad16::_samplesPerBlock = 65536;
   const int32_t ad16::_numberOfTriggers = 9;
   const float ad16::_conversionTimes[8] = { 4.15, 9.1, 18.8, 39, 78, 158, 315 }; // in usecs
+
+  /*************************************************************************************************/
+  void ad16::openDmap(const std::string &dmapFileName, const std::string &deviceAlias) {
+
+    // parse the dmap file and find the correct element
+    dmapFile::dmapElem elem;
+    try {
+      mtca4u::dmapFilesParser parser;
+      parser.parse_file(dmapFileName);
+      elem = parser.getdMapFileElem(deviceAlias);
+    }
+    catch(exLibMap &e) {
+      throw ad16Exception(std::string("Device cannot be found: ")+e.what(),ad16Exception::CANNOT_OPEN);
+    }
+
+    // open the file
+    open(elem.dev_file,elem.map_file_name);
+  }
 
   /*************************************************************************************************/
   void ad16::open(const std::string &deviceFileName, const std::string &mappingFileName) {
@@ -38,12 +58,23 @@ namespace mtca4u{
     else {
 
       // create the PCIe device driver
-      _realDevice = boost::shared_ptr<devPCIE>( new devPCIE );
-      _realDevice->openDev(deviceFileName);
+      try {
+        _realDevice = boost::shared_ptr<devPCIE>( new devPCIE );
+        _realDevice->openDev(deviceFileName);
+      }
+      catch(exDevPCIE &e) {
+        throw ad16Exception(std::string("PICe device cannot be opened: ")+e.what(),ad16Exception::CANNOT_OPEN);
+      }
 
       // create mapped device
-      _mappedDevice = boost::shared_ptr< devMap<devBase> >( new devMap<devBase> );
-      _mappedDevice->openDev( _realDevice, _map);
+      try {
+        _mappedDevice = boost::shared_ptr< devMap<devBase> >( new devMap<devBase> );
+        _mappedDevice->openDev( _realDevice, _map);
+      }
+      catch(exdevMap &e) {
+        throw ad16Exception(std::string("Mapped device cannot be created: ")+e.what(),ad16Exception::CANNOT_OPEN);
+      }
+
     }
 
     // set open flag. Needs to be done before initialisation, as we are using some functions testing this flag in the
