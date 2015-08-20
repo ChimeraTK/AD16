@@ -107,7 +107,7 @@ namespace mtca4u{
       /// Get data for single channel after a previous read(). Version for Python with numpy array
       void getChannelDataNumpy(unsigned int channel, boost::python::numeric::array &numpyArray);
 
-    private:
+    protected:
 
       /// flag if already opened
       bool _isOpen;
