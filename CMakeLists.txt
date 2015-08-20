@@ -44,11 +44,14 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 set(${PROJECT_NAME}_INCLUDE_DIRS ${${PROJECT_NAME}_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include/)
 aux_source_directory(${CMAKE_SOURCE_DIR}/src library_sources)
 
-MACRO( COPY_MAPPING_FILES )
-  foreach( MAPPING_FILE ad16dummy.map )
-    configure_file( tests/${MAPPING_FILE} ${PROJECT_BINARY_DIR}/${MAPPING_FILE} copyonly)
-  endforeach( MAPPING_FILE )
-ENDMACRO( COPY_MAPPING_FILES )
+MACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
+  foreach( FILE_TO_COPY ad16_scope_fmc25_r1224.mapp )
+    configure_file( tests/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
+  endforeach( FILE_TO_COPY )
+  foreach( FILE_TO_COPY ad16.dmap ADC_scope.py )
+    configure_file( examples/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
+  endforeach( FILE_TO_COPY )
+ENDMACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
 
 #Create the executables for automated unit testing.
 #Currently we assume that they are all tests contained in one file, so
@@ -66,8 +69,6 @@ if(TESTING_IS_ENABLED)
     target_link_libraries(${excutableName} ${MtcaMappedDevice_LIBRARIES} ${Boost_THREAD_LIBRARIES} ${PYTHON_LIBRARIES} ${PROJECT_NAME})
     add_test(${excutableName} ${excutableName})
   endforeach( testExecutableSrcFile )
-  
-  COPY_MAPPING_FILES()
 
   #The make coverage command is only available in debug mode
   IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -110,6 +111,9 @@ install(TARGETS ${PROJECT_NAME}
             RUNTIME DESTINATION bin
 	    LIBRARY DESTINATION lib
   )
+
+# copy mapping files and examples
+COPY_MAPPING_FILES_AND_EXAMPLES()
 
 #all include files go into include/PROJECT_NAME
 #The exclusion of ${PROJECT_NAME} prevents the recursive installation of the files just being installed.
