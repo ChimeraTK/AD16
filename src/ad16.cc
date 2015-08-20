@@ -67,13 +67,8 @@ namespace mtca4u {
       }
 
       // create mapped device
-      try {
-        _mappedDevice = boost::shared_ptr< devMap<devBase> >( new devMap<devBase> );
-        _mappedDevice->openDev( _realDevice, _map);
-      }
-      catch(exdevMap &e) {
-        throw ad16Exception(std::string("Mapped device cannot be created: ")+e.what(),ad16Exception::CANNOT_OPEN);
-      }
+      _mappedDevice = boost::shared_ptr< devMap<devBase> >( new devMap<devBase> );
+      _mappedDevice->openDev( _realDevice, _map);
 
     }
 
@@ -84,8 +79,13 @@ namespace mtca4u {
     // Initialise device. Procedure taken from Matlab code "ad16_init.m" by Lukasz Butkowski
 
     // send reset
-    _mappedDevice->getRegisterAccessor("WORD_RESET_N","BOARD0")->write(1);
-    _mappedDevice->getRegisterAccessor("WORD_AD16_ENA","AD160")->write(0);
+    try {
+      _mappedDevice->getRegisterAccessor("WORD_RESET_N","BOARD0")->write(1);
+      _mappedDevice->getRegisterAccessor("WORD_AD16_ENA","AD160")->write(0);
+    }
+    catch(std::exception &e) {
+      throw ad16Exception(e.what(),ad16Exception::CANNOT_OPEN);
+    }
 
     // read clock frequency
     _mappedDevice->getRegisterAccessor("WORD_CLK_FREQ","AD160")->read(clock_frequency, 2);
