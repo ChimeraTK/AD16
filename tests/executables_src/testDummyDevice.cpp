@@ -236,9 +236,14 @@ void DummyDeviceTest::testSingleTriggerRate(int rateDiv) {
   // select ADCA ready as DAQ strobe
   _dummyMapped.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
 
-  // enable trigger 0 and set it to 1 Hz
+  // enable trigger 0 and set it to seleted frequency
   _dummyMapped.getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(0);
-  _dummyMapped.getRegisterAccessor("WORD_TIMING_FREQ","APP0")->write(rateDiv);
+  int rateDivs[9] = {rateDiv, 0,0,0,0,0,0,0,0};
+  _dummyMapped.getRegisterAccessor("WORD_TIMING_FREQ","APP0")->write(rateDivs,9);
+
+  // set ADC sample rate
+  _dummyMapped.getRegisterAccessor("WORD_ADC_A_TIMING_DIV","AD160")->write(499);
+  _dummyMapped.getRegisterAccessor("WORD_ADC_B_TIMING_DIV","AD160")->write(499);
 
   // obtain current buffer
   int lastBuffer;
@@ -281,11 +286,18 @@ void DummyDeviceTest::testSingleTriggerRate(int rateDiv) {
 
     // check data
     int lengthOfaSequence = (*dataDemuxed)[0].size();
+    int error_count = 0;
     for(int iSample = 0; iSample < lengthOfaSequence; ++iSample) {
       BOOST_CHECK( (*dataDemuxed)[1][iSample] == iSample );
       BOOST_CHECK( (*dataDemuxed)[2][iSample] == 3 );             // this is our test value set above
       BOOST_CHECK( (*dataDemuxed)[3][iSample] == i );             // this is the trigger counter
+      if((*dataDemuxed)[1][iSample] != iSample || (*dataDemuxed)[2][iSample] != 3 || (*dataDemuxed)[3][iSample] != i ) error_count++;
+      if(error_count > 3) {
+        std::cerr << "*** Too many errors in this test, aborting current test at iSample = " << iSample << " for i = " << i << std::endl;
+        break;
+      }
     }
+
   }
   std::cout << std::endl;
 
