@@ -262,7 +262,7 @@ void Ad16Test::testSoftwareTriggeredMode() {
   ad.enableDaq();
 
   // wait until conversion is complete
-  usleep(1000000);
+  for(int i=0; i<65536; i++) ad._dummyDevice->timer.advanceAll();
 
   // send another trigger to swap the buffers
   ad.sendUserTrigger();
@@ -272,9 +272,11 @@ void Ad16Test::testSoftwareTriggeredMode() {
 
   // compare first channel data
   std::vector<int> data = ad.getChannelData(1);
+  bool FOUND_ERROR = false;
   for (uint columnCount = 0; columnCount < data.size(); ++columnCount) {
-    BOOST_CHECK( data[columnCount] == (int)columnCount );
+    if( data[columnCount] != (int)columnCount ) FOUND_ERROR = true;
   }
+  BOOST_CHECK( !FOUND_ERROR );
 
   // close device
   ad.close();
@@ -295,16 +297,18 @@ void Ad16Test::testPeriodicTriggeredMode() {
   ad.enableDaq();
 
   // wait until conversion is complete
-  while(!ad.conversionComplete()) usleep(1);
+  while(!ad.conversionComplete()) ad._dummyDevice->timer.advanceAll();
 
   // read data
   ad.read();
 
   // compare first channel data
   std::vector<int> data = ad.getChannelData(1);
-  for (uint columnCount = 0; columnCount < 10 /*data.size()*/; ++columnCount) {
-    BOOST_CHECK( data[columnCount] == (int)columnCount );
+  bool FOUND_ERROR = false;
+  for (uint columnCount = 0; columnCount < data.size(); ++columnCount) {
+    if( data[columnCount] != (int)columnCount ) FOUND_ERROR = true;
   }
+  BOOST_CHECK( !FOUND_ERROR );
 
   // close device
   ad.close();
