@@ -77,7 +77,6 @@ namespace mtca4u {
     _isOpen = true;
 
     // Initialise device. Procedure taken from Matlab code "ad16_init.m" by Lukasz Butkowski
-
     // send reset
     try {
       _mappedDevice->getRegisterAccessor("WORD_RESET_N","BOARD0")->write(1);
@@ -89,6 +88,11 @@ namespace mtca4u {
 
     // read clock frequency
     _mappedDevice->getRegisterAccessor("WORD_CLK_FREQ","AD160")->read(clock_frequency, 2);
+
+    // safety-check: clock frequency must be at a reasonable value.
+    if(clock_frequency[0] < 1000 || clock_frequency[1] < 1000) {
+      throw ad16Exception("Device reports unreasonable base clock frequencies.",ad16Exception::CANNOT_OPEN);
+    }
 
     // set default sampling frequency to 100kHz and oversampling ratio of 2
     setSamplingRate(100000, RATIO_2);
@@ -110,7 +114,7 @@ namespace mtca4u {
     _mappedDevice->getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(8);
 
     // disable the DAQ (probably unnecessary, as it should be disabled after reset)
-    //_mappedDevice->getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(0);
+    _mappedDevice->getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(0);
 
     // select source of strobe (= trigger of a single sample) in DAQ
     // note that the DAQ might run asynchronously with the ADCs, depending on this setting.
