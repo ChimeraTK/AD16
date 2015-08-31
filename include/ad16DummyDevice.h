@@ -25,7 +25,7 @@ namespace mtca4u {
 
       ad16DummyDevice() :
         timer(this),
-        theStateMachine(NULL),
+        theStateMachine(this),
         uniform(0, (1<<18) - 1),    // 18 bit random number
         currentBuffer(0),
         currentOffset(0),
@@ -34,8 +34,8 @@ namespace mtca4u {
         testValue(999),
         triggerCounter(0)
       {
-        theStateMachine = new stateMachine(this);
-        theStateMachine->start();
+        theStateMachine.get_state< theDaq* >()->setDummyDevice(this);
+        theStateMachine.start();
       }
 
       virtual ~ad16DummyDevice() {}
@@ -47,7 +47,7 @@ namespace mtca4u {
         physDummyDevice::openDev(mappingFileName, perm, pConfig);
 
         // send onDeviceOpen event
-        theStateMachine->process_event(onDeviceOpen());
+        theStateMachine.process_event(onDeviceOpen());
 
         // setup registers
         regTrigSel.open(this,"APP0","WORD_TIMING_TRG_SEL");
@@ -70,10 +70,10 @@ namespace mtca4u {
       /// on device close: fire the device-close event
       virtual void closeDev() {
         physDummyDevice::closeDev();
-        theStateMachine->process_event(onDeviceClose());
+        theStateMachine.process_event(onDeviceClose());
       }
 
-      typedef ad16DummyDevice myDummyDeviceType;
+      //typedef ad16DummyDevice myDummyDeviceType;
 
       /// handy name for the int32_t register accessor
       typedef dummyRegister<int32_t,ad16DummyDevice> intRegister;
@@ -144,10 +144,10 @@ namespace mtca4u {
 
       /// connect on-write events with register names
       WRITE_EVENT_TABLE(
-          CONNECT_REGISTER_EVENT(onWriteDaqEnable, "APP0","WORD_DAQ_ENABLE")
-          CONNECT_REGISTER_EVENT(onWriteTrigSel, "APP0","WORD_TIMING_TRG_SEL")
-          CONNECT_REGISTER_EVENT(onWriteUserTrigger, "APP0","WORD_TIMING_USER_TRG")
-          CONNECT_REGISTER_EVENT(onWriteTrigFreq, "APP0","WORD_TIMING_FREQ")
+        CONNECT_REGISTER_EVENT(onWriteDaqEnable, "APP0","WORD_DAQ_ENABLE")
+        CONNECT_REGISTER_EVENT(onWriteTrigSel, "APP0","WORD_TIMING_TRG_SEL")
+        CONNECT_REGISTER_EVENT(onWriteUserTrigger, "APP0","WORD_TIMING_USER_TRG")
+        CONNECT_REGISTER_EVENT(onWriteTrigFreq, "APP0","WORD_TIMING_FREQ")
       )
 
       /// connect on-read events with register names
@@ -161,72 +161,73 @@ namespace mtca4u {
       DECLARE_REGISTER_GUARD( internalTriggerSelected, dev->regTrigSel.get() == 0 )
 
       /// states
-      DECLARE_PLAIN_STATE(DevClosed)
-      DECLARE_PLAIN_STATE(DaqStopped)
-      DECLARE_PLAIN_STATE(DaqRunning)
-      DECLARE_PLAIN_STATE(TriggerDisabled)
-      DECLARE_PLAIN_STATE(TriggerUser)
-      DECLARE_PLAIN_STATE(TriggerInternal)
+      DECLARE_STATE(DevClosed)
+      DECLARE_STATE(DaqStopped)
+      DECLARE_STATE(DaqSetup)
+      DECLARE_STATE(DaqRunning)
+      DECLARE_STATE(TriggerSetup)
+      DECLARE_STATE(TriggerUser)
+      DECLARE_STATE(TriggerInternal)
 
       /// action: set the timer for the internal trigger
       DECLARE_ACTION(setTriggerTimer,
-          int trig = dev->regTrigSel.get();
-          int fdiv = dev->regTrigFreq.get(trig);
-          dev->timer.trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        int trig = dev->regTrigSel.get();
+        int fdiv = dev->regTrigFreq.get(trig);
+        dev->timer.trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
       )
 
       /// action: set the strobe timer
       DECLARE_ACTION(setStrobeTimer,
-          int fdiv = dev->regSamplingFreqA.get();
-          dev->timer.strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        int fdiv = dev->regSamplingFreqA.get();
+        dev->timer.strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
       )
 
       /// action: fill a single sample per channel into the buffer
       DECLARE_ACTION(fillBuffer,
-          // do nothing if buffer is already full
-          if(dev->currentOffset >= numberOfSamples) return;
-          // determine buffer to write to
-          intRegister *acc;
-          if(dev->currentBuffer == 0) {
-            acc = &dev->regBufferA;
+        // do nothing if buffer is already full
+        if(dev->currentOffset >= numberOfSamples) return;
+        // determine buffer to write to
+        intRegister *acc;
+        if(dev->currentBuffer == 0) {
+          acc = &dev->regBufferA;
+        }
+        else {
+          acc = &dev->regBufferB;
+        }
+        // fill the buffer
+        for(int ic=0; ic<numberOfChannels; ic++) {
+          int32_t ival;
+          if(ic == 0) {
+            ival = 1000.*sin(2.*acos(-1) * 1000. * (float)dev->currentOffset/(float)numberOfSamples);
+          }
+          else if(ic == 1) {
+            ival = dev->currentOffset;
+          }
+          else if(ic == 2) {
+            ival = dev->testValue;
+          }
+          else if(ic == 3) {
+            ival = dev->testValue;
           }
           else {
-            acc = &dev->regBufferB;
+            ival = dev->uniform(dev->rng);
           }
-          // fill the buffer
-          for(int ic=0; ic<numberOfChannels; ic++) {
-            int32_t ival;
-            if(ic == 0) {
-              ival = 1000.*sin(2.*acos(-1) * 1000. * (float)dev->currentOffset/(float)numberOfSamples);
-            }
-            else if(ic == 1) {
-              ival = dev->currentOffset;
-            }
-            else if(ic == 2) {
-              ival = dev->testValue;
-            }
-            else if(ic == 3) {
-              ival = dev->testValue;
-            }
-            else {
-              ival = dev->uniform(dev->rng);
-            }
-            int ioffset = dev->currentOffset*numberOfChannels + ic;
-            acc->set(ival, ioffset);
-          }
-          // increment the offset
-          dev->currentOffset++;
+          int ioffset = dev->currentOffset*numberOfChannels + ic;
+          acc->set(ival, ioffset);
+        }
+        // increment the offset
+        dev->currentOffset++;
       )
 
       /// action: execute trigger
       DECLARE_ACTION(executeTrigger,
-          // change current buffer
-          dev->currentBuffer = ( dev->currentBuffer == 0 ? 1 : 0 );
-          dev->regCurBuffer = dev->currentBuffer;
-          // reset offset
-          dev->currentOffset = 0;
-          // increment trigger counter
-          dev->triggerCounter++;
+        // change current buffer
+        dev->currentBuffer = ( dev->currentBuffer == 0 ? 1 : 0 );
+        dev->regCurBuffer = dev->currentBuffer;
+        // reset offset
+        dev->currentOffset = 0;
+        // increment trigger counter
+        dev->triggerCounter++;
       )
 
       /// events for enabling and disabling the trigger
@@ -235,80 +236,68 @@ namespace mtca4u {
 
       /// actions to send events to disable and enable the trigger
       DECLARE_ACTION(sendEnableTrigger,
-          fsm.process_event(enableTrigger());
+        fsm.process_event(enableTrigger());
       )
       DECLARE_ACTION(sendDisableTrigger,
-          fsm.process_event(disableTrigger());
+        fsm.process_event(disableTrigger());
       )
 
       /// define the state machine structure
-      class stateMachine_ : public msm::front::state_machine_def<stateMachine_> {
-        public:
-          stateMachine_(ad16DummyDevice *_dev) : dev(_dev) {}
-          ad16DummyDevice *dev;
+      DECLARE_STATE_MACHINE(ad16DummyDevice, theDaq, DaqSetup() << TriggerSetup(), (
+        // =======================================================================================================
+        // DAQ region
+        // setup the DAQ by starting the strobe timer
+        DaqSetup() / setStrobeTimer() == DaqRunning(),
 
-          // initial states
-          typedef mpl::vector<DevClosed,TriggerDisabled> initial_state;
+        // receive strobe: fill the buffer and restart the timer
+        DaqRunning() + onStrobe() / ( fillBuffer(), setStrobeTimer() ),
 
-          // transition table
-          BOOST_MSM_EUML_DECLARE_TRANSITION_TABLE((
+        // =======================================================================================================
+        // trigger region
+        // setup the trigger
+        TriggerSetup() [ userTriggerSelected() ] == TriggerUser(),
+        TriggerSetup() [ internalTriggerSelected() ] / setTriggerTimer() == TriggerInternal(),
 
-              // =======================================================================================================
-              // DAQ region
-              // open and close the device
-              DevClosed() + onDeviceOpen() == DaqStopped(),
-              DaqRunning() + onDeviceClose() / sendDisableTrigger() == DevClosed(),
-              DaqStopped() + onDeviceClose() == DevClosed(),
+        // change selected trigger
+        TriggerInternal() + onWriteTrigSel() == TriggerSetup(),
+        TriggerUser() + onWriteTrigSel() == TriggerSetup(),
 
-              // start and stop the daq
-              DaqStopped() + onWriteDaqEnable() [ regIsTrue() ] / ( sendEnableTrigger(), setStrobeTimer() ) == DaqRunning(),
-              DaqRunning() + onWriteDaqEnable() [ regIsFalse() ] / sendDisableTrigger() == DaqStopped(),
+        // update the trigger frequency
+        TriggerInternal() + onWriteTrigFreq() / setTriggerTimer(),
 
-              // receive strobe: fill the buffer
-              DaqRunning() + onStrobe() / ( fillBuffer(), setStrobeTimer() ),
+        // user trigger mode
+        TriggerUser() + onWriteUserTrigger() / executeTrigger(),
 
-              // =======================================================================================================
-              // trigger region
-              // enable and disable the trigger
-              TriggerDisabled() + enableTrigger() [ userTriggerSelected() ] == TriggerUser(),
-              TriggerDisabled() + enableTrigger() [ internalTriggerSelected() ] / setTriggerTimer() == TriggerInternal(),
-              TriggerInternal() + disableTrigger() == TriggerDisabled(),
-              TriggerUser() + disableTrigger() == TriggerDisabled(),
+        // internal trigger mode
+        TriggerInternal() + onTrigger() / ( setTriggerTimer(), executeTrigger() ),
 
-              // change selected trigger
-              TriggerInternal() + onWriteTrigSel() [ userTriggerSelected() ] == TriggerUser(),
-              TriggerUser() + onWriteTrigSel() [ internalTriggerSelected() ] / setTriggerTimer() == TriggerInternal(),
+        // =======================================================================================================
+        // ignore some events in certain states (might occur after state change and should not throw an exception)
+        TriggerUser() + onWriteTrigFreq(),
+        TriggerInternal() + onWriteUserTrigger(),
+        TriggerUser() + onTrigger(),
+        DaqSetup() + onDeviceOpen()
+      ))
 
-              // update the trigger frequency
-              TriggerInternal() + onWriteTrigFreq() / setTriggerTimer(),
+      /// define the state machine structure
+      DECLARE_STATE_MACHINE(ad16DummyDevice, mainStateMachine, DevClosed(), (
+        // =======================================================================================================
+        // open and close the device
+        DevClosed() + onDeviceOpen() == DaqStopped(),
+        DaqStopped() + onDeviceClose() == DevClosed(),
+        theDaq() + onDeviceClose() == DevClosed(),
 
-              // user trigger mode
-              TriggerUser() + onWriteUserTrigger() / executeTrigger(),
+        // start and stop the DAQ
+        DaqStopped() + onWriteDaqEnable() [ regIsTrue() ] == theDaq(),
+        theDaq() + onWriteDaqEnable() [ regIsFalse() ] == DaqStopped(),
 
-              // internal trigger mode
-              TriggerInternal() + onTrigger() / ( setTriggerTimer(), executeTrigger() ),
+        // =======================================================================================================
+        // ignore some events in certain states (might occur after state change and should not throw an exception)
+        DaqStopped() + onStrobe(),
+        DevClosed() + onStrobe()
+      ))
 
-              // =======================================================================================================
-              // ignore some events in certain states (might occur after state change and should not throw an exception)
-              TriggerDisabled() + onWriteTrigSel(),
-              TriggerDisabled() + onWriteTrigFreq(),
-              TriggerDisabled() + onWriteUserTrigger(),
-              TriggerUser() + onWriteTrigFreq(),
-              TriggerInternal() + onWriteUserTrigger(),
-              TriggerDisabled() + onTrigger(),
-              TriggerUser() + onTrigger(),
-              DaqStopped() + onStrobe(),
-              DevClosed() + onStrobe()
-
-          ),transition_table)
-      };
-
-      /// backend for the state machine
-      typedef msm::back::state_machine<stateMachine_> stateMachine;
-
-      /// the instance of the state machine. Must be public to avoid needing a lot of friend classes (all timers etc.)
-      stateMachine *theStateMachine;
-
+      mainStateMachine theStateMachine;
 
       /// random number generator to fill channels with white noise
       boost::mt11213b rng;

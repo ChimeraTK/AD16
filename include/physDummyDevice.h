@@ -17,46 +17,51 @@
 #include <boost/msm/front/state_machine_def.hpp>
 #include <boost/msm/front/euml/euml.hpp>
 
+using namespace boost::msm::front::euml;
 namespace msm = boost::msm;
 namespace mpl = boost::mpl;
 
-//
-// Declare an event. Use instead of BOOST_MSM_EUML_EVENT, as we must not create instances for the events as well.
-//
+///
+/// Declare an event. Use instead of BOOST_MSM_EUML_EVENT, as we must not create instances for the events as well.
+///
 #define DECLARE_EVENT(name)                                                                                     \
   class name : public msm::front::euml::euml_event< name > {};
 
-//
-// Declare a plain state, without any entry or exit functions
-//
-#define DECLARE_PLAIN_STATE(name)                                                                               \
+///
+/// Declare a plain state, without any entry or exit functions etc.
+///
+#define DECLARE_STATE(name)                                                                                     \
   class name : public msm::front::state<> , public msm::front::euml::euml_state<name> {};
 
-//
-// Declare a state. The second arg decl can be used to define onEntry and onExit conditions with the macros
-// STATE_ON_ENTRY and STATE_ON_EXIT.
-//
-#define DECLARE_STATE(name,decl)                                                                                \
+///
+/// Declare a state with actions. The second arg decl can be used to define onEntry and onExit actions with the macros
+/// STATE_ON_ENTRY and STATE_ON_EXIT.
+///
+#define DECLARE_ACTION_STATE(name,decl)                                                                         \
   class name : public msm::front::state<> , public msm::front::euml::euml_state<name> {                         \
     public:                                                                                                     \
       decl                                                                                                      \
   };
 
-// for use inside DECLARE_STATE(), see documentation there. Put the code to be executed on entry in braces after the
-// macro invocation.
+///
+/// for use inside DECLARE_STATE(), see documentation there. Put the code to be executed on entry in braces after the
+/// macro invocation.
+///
 #define STATE_ON_ENTRY                                                                                          \
    template <class Event,class FSM>                                                                             \
    void on_entry(Event const&,FSM&)
 
-// for use inside DECLARE_STATE(), see documentation there Put the code to be executed on exit in braces after the
-// macro invocation.
+///
+/// for use inside DECLARE_STATE(), see documentation there Put the code to be executed on exit in braces after the
+/// macro invocation.
+///
 #define STATE_ON_EXIT                                                                                           \
    template <class Event,class FSM>                                                                             \
    void on_exit(Event const&,FSM&)
 
-//
-// Declare a logging state. Entry and exit of this state will be looged to std::cout.
-//
+///
+/// Declare a logging state. Entry and exit of this state will be looged to std::cout.
+///
 #define DECLARE_LOGGING_STATE(name)                                                                             \
   class name : public msm::front::state<> , public msm::front::euml::euml_state<name> {                         \
     public:                                                                                                     \
@@ -66,46 +71,46 @@ namespace mpl = boost::mpl;
       void on_exit(Event const&,FSM&) { std::cout << "Leaving state: " << #name << std::endl; }                 \
   };
 
-//
-// Provide a "table" of events and register names using the CONNECT_REGISTER_EVENT macro for write events
-//
+///
+/// Provide a "table" of events and register names using the CONNECT_REGISTER_EVENT macro for write events
+///
 #define WRITE_EVENT_TABLE(table)                                                                                \
   void regWriteEvents(uint32_t regOffset, int32_t const *data, size_t size, uint8_t bar) {                      \
     (void)regOffset; (void)data; (void)size; (void)bar;                                                         \
     table                                                                                                       \
   }
 
-//
-// Provide a "table" of events and register names using the CONNECT_REGISTER_EVENT macro for read events
-//
+///
+/// Provide a "table" of events and register names using the CONNECT_REGISTER_EVENT macro for read events
+///
 #define READ_EVENT_TABLE(table)                                                                                 \
   void regReadEvents(uint32_t regOffset, int32_t const *data, size_t size, uint8_t bar) {                       \
     (void)regOffset; (void)data; (void)size; (void)bar;                                                         \
     table                                                                                                       \
   }
 
-//
-// Connect events with register names. The first argument eventName is the name of an event previously
-// declared using BOOST_MSM_EUML_EVENT. Use this macro in the of the WRITE_EVENT_TABLE and READ_EVENT_TABLE macros.
-// Do not separate multiple calls to CONNECT_REGISTER_EVENT inside the same WRITE_EVENT_TABLE/READ_EVENT_TABLE macro by
-// any separator (i.e. no comma in between - starting a new line is allowed, though!).
-//
+///
+/// Connect events with register names. The first argument eventName is the name of an event previously
+/// declared using BOOST_MSM_EUML_EVENT. Use this macro in the of the WRITE_EVENT_TABLE and READ_EVENT_TABLE macros.
+/// Do not separate multiple calls to CONNECT_REGISTER_EVENT inside the same WRITE_EVENT_TABLE/READ_EVENT_TABLE macro by
+/// any separator (i.e. no comma in between - starting a new line is allowed, though!).
+///
 #define CONNECT_REGISTER_EVENT(eventName, registerModule, registerName)                                         \
   {                                                                                                             \
     mapFile::mapElem elem;                                                                                      \
     _registerMapping->getRegisterInfo(registerName, elem, registerModule);                                      \
     if(bar == elem.reg_bar && regOffset >= elem.reg_address && regOffset < elem.reg_address+elem.reg_size) {    \
-      theStateMachine->process_event(eventName ());                                                             \
+      theStateMachine.process_event(eventName ());                                                              \
     }                                                                                                           \
   }
 
-//
-// Declare a guard condition on the value of a register. The resulting guard condition can be used on an event
-// defined with the CONNECT_REGISTER_EVENT macro. The first argument guardName is the name of the resulting guard class
-// and the second argument will be parsed as the guard condition (standard C++ syntax). Inside the condition, the
-// variable "value" can be used which contains the value of the register written in the event (type: int32_t, always the
-// first word written).
-//
+///
+/// Declare a guard condition on the value of a register. The resulting guard condition can be used on an event
+/// defined with the CONNECT_REGISTER_EVENT macro. The first argument guardName is the name of the resulting guard class
+/// and the second argument will be parsed as the guard condition (standard C++ syntax). Inside the condition, the
+/// variable "value" can be used which contains the value of the register written in the event (type: int32_t, always the
+/// first word written).
+///
 #define DECLARE_REGISTER_GUARD(guardName, condition)                                                            \
     class guardName :  msm::front::euml::euml_action<guardName>                                                 \
     {                                                                                                           \
@@ -115,7 +120,7 @@ namespace mpl = boost::mpl;
         template <class Fsm,class Evt,class SourceState,class TargetState>                                      \
         bool operator()(Evt const& ,Fsm& fsm,SourceState&,TargetState& )                                        \
         {                                                                                                       \
-            myDummyDeviceType *dev = fsm.dev;                                                                   \
+            typename Fsm::devType *dev = fsm.dev;                                                               \
             assert( dev->lastWrittenData != NULL );                                                             \
             int32_t value = *(dev->lastWrittenData);                                                            \
             (void)value;                                                                                        \
@@ -123,9 +128,28 @@ namespace mpl = boost::mpl;
         }                                                                                                       \
     };
 
-//
-// declare an action with arbitrary code. The second argument contains the code.
-//
+///
+/// Declare a guard condition. The first argument guardName is the name of the resulting guard class
+/// and the second argument contains the code. The code must contain a return statement returning a boolean.
+///
+#define DECLARE_GUARD(guardName, code)                                                                          \
+    class guardName :  msm::front::euml::euml_action<guardName>                                                 \
+    {                                                                                                           \
+      public:                                                                                                   \
+        guardName() {}                                                                                          \
+        typedef guardName action_name;                                                                          \
+        template <class Fsm,class Evt,class SourceState,class TargetState>                                      \
+        bool operator()(Evt const& ,Fsm& fsm,SourceState&,TargetState& )                                        \
+        {                                                                                                       \
+            typename Fsm::devType *dev = fsm.dev;                                                               \
+            (void)dev;                                                                                          \
+            code                                                                                                \
+        }                                                                                                       \
+    };
+
+///
+/// declare an action with arbitrary code. The second argument contains the code.
+///
 #define DECLARE_ACTION(actionName, code)                                                                        \
     class actionName :  msm::front::euml::euml_action<actionName>                                               \
     {                                                                                                           \
@@ -135,11 +159,44 @@ namespace mpl = boost::mpl;
         template <class Fsm,class Evt,class SourceState,class TargetState>                                      \
         void operator()(Evt const& ,Fsm& fsm,SourceState&,TargetState& )                                        \
         {                                                                                                       \
-            myDummyDeviceType *dev = fsm.dev;                                                                   \
+            typename Fsm::devType *dev = fsm.dev;                                                               \
             (void)dev;                                                                                          \
             code                                                                                                \
         }                                                                                                       \
     };
+
+///
+/// declare a state machine.
+/// dummyDeviceType is the class name of the physDummyDevice implementation the state machine will be used in
+/// stateMachineName is the name of the state machine itself. Several types will be defined based on this names with
+/// one or more trailing underscores.
+/// initialState is the name of the initial state. Multiple states can be added by separating them with "<<".
+/// transitionTable is the transition table in eUML syntax.
+///
+#define DECLARE_STATE_MACHINE(dummyDeviceType, stateMachineName, initialState, transitionTable)                 \
+    BOOST_MSM_EUML_TRANSITION_TABLE((                                                                           \
+        transitionTable                                                                                         \
+    ),stateMachineName ## _table)                                                                               \
+    BOOST_MSM_EUML_DECLARE_STATE_MACHINE(( stateMachineName ## _table,                                          \
+                                           init_ << initialState ),                                             \
+                                           stateMachineName ## __)                                              \
+    class stateMachineName ## _ : public stateMachineName ## __  {                                              \
+      public:                                                                                                   \
+        stateMachineName ## _(dummyDeviceType *_dev)                                                            \
+        : stateMachineName ## __(),                                                                             \
+          dev(_dev)                                                                                             \
+        {}                                                                                                      \
+        stateMachineName ## _()                                                                                 \
+          : stateMachineName ## __(),                                                                           \
+          dev(NULL)                                                                                             \
+        {}                                                                                                      \
+        void setDummyDevice(dummyDeviceType *_dev) {dev = _dev;}                                                \
+        dummyDeviceType *dev;                                                                                   \
+        typedef dummyDeviceType devType;                                                                        \
+    };                                                                                                          \
+    typedef msm::back::state_machine<stateMachineName ## _> stateMachineName;
+
+
 
 namespace mtca4u {
 
@@ -233,7 +290,7 @@ namespace mtca4u {
             current += tval;
             if(request > 0 && current >= request) {
               request = -1;
-              dev->theStateMachine->process_event( timerAction() );
+              dev->theStateMachine.process_event( timerAction() );
               return true;
             }
             return false;
@@ -245,7 +302,7 @@ namespace mtca4u {
             if(request > 0) {
               current = request;
               request = -1;
-              dev->theStateMachine->process_event( timerAction() );
+              dev->theStateMachine.process_event( timerAction() );
               return true;
             }
             return false;

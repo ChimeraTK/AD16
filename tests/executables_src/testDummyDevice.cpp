@@ -147,7 +147,10 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
   bool ERROR_FOUND = false;
   for(int i=0; i<65536; i++) {
     _dummyDevice->timer.advanceSub(_dummyDevice->timer.strobe);
-    if( round(_dummyDevice->timer.strobe.getRemaining()*1000000.) != 20000 ) ERROR_FOUND = true;
+    if( round(_dummyDevice->timer.strobe.getRemaining()*1000000.) != 20000 ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timer.strobe.getRemaining()*1000000. << std::endl;
+      ERROR_FOUND = true;
+    }
   }
   BOOST_CHECK( !ERROR_FOUND );
 
@@ -179,7 +182,10 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
   // check data:
   ERROR_FOUND = false;
   for(int iSample = 0; iSample < lengthOfaSequence; ++iSample) {
-    if( ( (*dataDemuxed)[1][iSample] != iSample ) || ( (*dataDemuxed)[2][iSample] != 1 ) ) ERROR_FOUND = true;
+    if( ( (*dataDemuxed)[1][iSample] != iSample ) || ( (*dataDemuxed)[2][iSample] != 1 ) ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong sample values for sample " << iSample << ": " << (*dataDemuxed)[1][iSample] << " " << (*dataDemuxed)[2][iSample] << std::endl;
+      ERROR_FOUND = true;
+    }
   }
   BOOST_CHECK( !ERROR_FOUND );
 
@@ -221,7 +227,10 @@ void DummyDeviceTest::testAutoTriggerMode() {
   do {
     _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
     _dummyDevice->timer.advanceSub(_dummyDevice->timer.strobe);
-    if( round(_dummyDevice->timer.strobe.getRemaining()*1000000.) != 10000 ) ERROR_FOUND = true;
+    if( round(_dummyDevice->timer.strobe.getRemaining()*1000000.) != 10000 ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timer.strobe.getRemaining()*1000000. << std::endl;
+      ERROR_FOUND = true;
+    }
   } while(currentBuffer == lastBuffer);
   BOOST_CHECK( !ERROR_FOUND );
 
@@ -244,7 +253,10 @@ void DummyDeviceTest::testAutoTriggerMode() {
   // check data:
   ERROR_FOUND = false;
   for(int iSample = 0; iSample < lengthOfaSequence; ++iSample) {
-    if( ( (*dataDemuxed)[1][iSample] != iSample ) || ( (*dataDemuxed)[2][iSample] != 2 ) ) ERROR_FOUND = true;
+    if( ( (*dataDemuxed)[1][iSample] != iSample ) || ( (*dataDemuxed)[2][iSample] != 2 ) ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong sample values for sample " << iSample << ": " << (*dataDemuxed)[1][iSample] << " " << (*dataDemuxed)[2][iSample] << std::endl;
+      ERROR_FOUND = true;
+    }
   }
   BOOST_CHECK( !ERROR_FOUND );
 
