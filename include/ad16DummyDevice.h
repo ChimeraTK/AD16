@@ -89,10 +89,10 @@ namespace mtca4u {
       DECLARE_EVENT(onStrobe)
 
       /// master timer
-      class ad16MasterTimer : public masterTimer {
+      class ad16TimerGroup : public timerGroup {
         public:
-          ad16MasterTimer(ad16DummyDevice *dev) :
-            masterTimer(),
+          ad16TimerGroup(ad16DummyDevice *dev) :
+            timerGroup(),
             strobe(dev),
             trigger(dev)
           {}
@@ -102,7 +102,7 @@ namespace mtca4u {
             bool r = false;
             r = strobe.advance(tval) || r;
             r = trigger.advance(tval) || r;
-            masterTimer::advanceBy(tval);
+            timerGroup::advanceBy(tval);
             return r;
           }
 
@@ -125,7 +125,7 @@ namespace mtca4u {
           timer<onTrigger, ad16DummyDevice> trigger;
 
       };
-      ad16MasterTimer timer;
+      ad16TimerGroup timer;
 
       /// register read/write events
       DECLARE_EVENT(onWriteDaqEnable)
@@ -230,18 +230,6 @@ namespace mtca4u {
         dev->triggerCounter++;
       )
 
-      /// events for enabling and disabling the trigger
-      DECLARE_EVENT(enableTrigger)
-      DECLARE_EVENT(disableTrigger)
-
-      /// actions to send events to disable and enable the trigger
-      DECLARE_ACTION(sendEnableTrigger,
-        fsm.process_event(enableTrigger());
-      )
-      DECLARE_ACTION(sendDisableTrigger,
-        fsm.process_event(disableTrigger());
-      )
-
       /// define the state machine structure
       DECLARE_STATE_MACHINE(ad16DummyDevice, theDaq, DaqSetup() << TriggerSetup(), (
         // =======================================================================================================
@@ -250,7 +238,7 @@ namespace mtca4u {
         DaqSetup() / setStrobeTimer() == DaqRunning(),
 
         // receive strobe: fill the buffer and restart the timer
-        DaqRunning() + onStrobe() / ( fillBuffer(), setStrobeTimer() ),
+        DaqRunning() + onStrobe() / fillBuffer() == DaqSetup(),
 
         // =======================================================================================================
         // trigger region

@@ -296,18 +296,6 @@ namespace mtca4u {
             return false;
           }
 
-          /// advance the timer to the next requested time. Returns true if the timer was fired. Otherwise the timer
-          /// was not set and thus the current time remains unchanged.
-          bool advance() {
-            if(request > 0) {
-              current = request;
-              request = -1;
-              dev->theStateMachine.process_event( timerAction() );
-              return true;
-            }
-            return false;
-          }
-
           /// obtain remaining time until the timer fires. Will be negative if the timer is not set.
           double getRemaining() {
             if(request > 0) {
@@ -327,12 +315,12 @@ namespace mtca4u {
           double current;
       };
 
-      /// master timer interface class (TODO find better name?)
+      /// timer group interface class
       /// The implementation needs to be specific for all actual timer types
-      class masterTimer {
+      class timerGroup {
         public:
-          masterTimer() : current(0) {}
-          virtual ~masterTimer() {}
+          timerGroup() : current(0) {}
+          virtual ~timerGroup() {}
 
           /// advance the timer's current time by tval milliseconds. Returns true if any timer was fired
           /// TODO must not advance more than getRemaining() at a time!
