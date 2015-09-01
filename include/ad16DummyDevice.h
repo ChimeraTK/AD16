@@ -11,7 +11,6 @@
 namespace msm = boost::msm;
 namespace mpl = boost::mpl;
 
-
 namespace mtca4u {
 
 
@@ -19,12 +18,12 @@ namespace mtca4u {
    *  implements all registers defined in the mapping file in memory.
    *  Like this it mimics the real PCIe device.
    */
-  class ad16DummyDevice : public physDummyDevice
+  class ad16DummyDevice : public physDummyDevice<ad16DummyDevice>
   {
     public:
 
       ad16DummyDevice() :
-        timer(this),
+        timers(this),
         theStateMachine(this),
         uniform(0, (1<<18) - 1),    // 18 bit random number
         currentBuffer(0),
@@ -73,11 +72,6 @@ namespace mtca4u {
         theStateMachine.process_event(onDeviceClose());
       }
 
-      //typedef ad16DummyDevice myDummyDeviceType;
-
-      /// handy name for the int32_t register accessor
-      typedef dummyRegister<int32_t,ad16DummyDevice> intRegister;
-
       /// events for device opening and closing
       DECLARE_EVENT(onDeviceOpen)
       DECLARE_EVENT(onDeviceClose)
@@ -88,44 +82,9 @@ namespace mtca4u {
       /// event fired on strobe (-> fill a single sample for all channels)
       DECLARE_EVENT(onStrobe)
 
-      /// master timer
-      class ad16TimerGroup : public timerGroup {
-        public:
-          ad16TimerGroup(ad16DummyDevice *dev) :
-            timerGroup(),
-            strobe(dev),
-            trigger(dev)
-          {}
-
-          /// advance the timer's current time by tval milliseconds. Returns true if any timer was fired
-          virtual bool advanceBy(double tval) {
-            bool r = false;
-            r = strobe.advance(tval) || r;
-            r = trigger.advance(tval) || r;
-            timerGroup::advanceBy(tval);
-            return r;
-          }
-
-          /// get remaining time until the next timer fires.
-          virtual double getRemaining() {
-            double r = DBL_MAX;
-            double rr;
-            rr= strobe.getRemaining();
-            if(rr > 0) r = fmin(rr, r);
-            rr = trigger.getRemaining();
-            if(rr > 0) r = fmin(rr, r);
-            if(r >= DBL_MAX) r = -1;
-            return r;
-          }
-
-          /// strobe timer
-          timer<onStrobe, ad16DummyDevice> strobe;
-
-          /// trigger timer
-          timer<onTrigger, ad16DummyDevice> trigger;
-
-      };
-      ad16TimerGroup timer;
+      /// timer group
+      typedef timerGroup< set< timer<onStrobe>, timer<onTrigger> > > ad16TimerGroup;
+      ad16TimerGroup timers;
 
       /// register read/write events
       DECLARE_EVENT(onWriteDaqEnable)
@@ -173,13 +132,15 @@ namespace mtca4u {
       DECLARE_ACTION(setTriggerTimer,
         int trig = dev->regTrigSel.get();
         int fdiv = dev->regTrigFreq.get(trig);
-        dev->timer.trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        dev->timers.get(timer<onTrigger>()).set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        //dev->timer.trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
       )
 
       /// action: set the strobe timer
       DECLARE_ACTION(setStrobeTimer,
         int fdiv = dev->regSamplingFreqA.get();
-        dev->timer.strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+      dev->timers.get(timer<onStrobe>()).set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        //dev->timer.strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
       )
 
       /// action: fill a single sample per channel into the buffer
@@ -231,7 +192,7 @@ namespace mtca4u {
       )
 
       /// define the state machine structure
-      DECLARE_STATE_MACHINE(ad16DummyDevice, theDaq, DaqSetup() << TriggerSetup(), (
+      DECLARE_STATE_MACHINE(theDaq, DaqSetup() << TriggerSetup(), (
         // =======================================================================================================
         // DAQ region
         // setup the DAQ by starting the strobe timer
@@ -268,7 +229,7 @@ namespace mtca4u {
       ))
 
       /// define the state machine structure
-      DECLARE_STATE_MACHINE(ad16DummyDevice, mainStateMachine, DevClosed(), (
+      DECLARE_STATE_MACHINE(mainStateMachine, DevClosed(), (
         // =======================================================================================================
         // open and close the device
         DevClosed() + onDeviceOpen() == DaqStopped(),

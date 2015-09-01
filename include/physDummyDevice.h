@@ -10,16 +10,22 @@
 
 #include <string>
 
-#include <MtcaMappedDevice/DummyDevice.h>
+#include <boost/fusion/container/set.hpp>
+#include <boost/fusion/algorithm.hpp>
+#include <boost/fusion/include/at_key.hpp>
+
 #include <boost/bind.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <boost/msm/back/state_machine.hpp>
 #include <boost/msm/front/state_machine_def.hpp>
 #include <boost/msm/front/euml/euml.hpp>
 
+#include <MtcaMappedDevice/DummyDevice.h>
+
 using namespace boost::msm::front::euml;
 namespace msm = boost::msm;
 namespace mpl = boost::mpl;
+using boost::fusion::set;
 
 ///
 /// Declare an event. Use instead of BOOST_MSM_EUML_EVENT, as we must not create instances for the events as well.
@@ -120,7 +126,7 @@ namespace mpl = boost::mpl;
         template <class Fsm,class Evt,class SourceState,class TargetState>                                      \
         bool operator()(Evt const& ,Fsm& fsm,SourceState&,TargetState& )                                        \
         {                                                                                                       \
-            typename Fsm::devType *dev = fsm.dev;                                                               \
+            dummyDeviceType *dev = fsm.dev;                                                                     \
             assert( dev->lastWrittenData != NULL );                                                             \
             int32_t value = *(dev->lastWrittenData);                                                            \
             (void)value;                                                                                        \
@@ -141,7 +147,7 @@ namespace mpl = boost::mpl;
         template <class Fsm,class Evt,class SourceState,class TargetState>                                      \
         bool operator()(Evt const& ,Fsm& fsm,SourceState&,TargetState& )                                        \
         {                                                                                                       \
-            typename Fsm::devType *dev = fsm.dev;                                                               \
+            dummyDeviceType *dev = fsm.dev;                                                                     \
             (void)dev;                                                                                          \
             code                                                                                                \
         }                                                                                                       \
@@ -159,7 +165,7 @@ namespace mpl = boost::mpl;
         template <class Fsm,class Evt,class SourceState,class TargetState>                                      \
         void operator()(Evt const& ,Fsm& fsm,SourceState&,TargetState& )                                        \
         {                                                                                                       \
-            typename Fsm::devType *dev = fsm.dev;                                                               \
+            dummyDeviceType *dev = fsm.dev;                                                                     \
             (void)dev;                                                                                          \
             code                                                                                                \
         }                                                                                                       \
@@ -173,7 +179,7 @@ namespace mpl = boost::mpl;
 /// initialState is the name of the initial state. Multiple states can be added by separating them with "<<".
 /// transitionTable is the transition table in eUML syntax.
 ///
-#define DECLARE_STATE_MACHINE(dummyDeviceType, stateMachineName, initialState, transitionTable)                 \
+#define DECLARE_STATE_MACHINE(stateMachineName, initialState, transitionTable)                                  \
     BOOST_MSM_EUML_TRANSITION_TABLE((                                                                           \
         transitionTable                                                                                         \
     ),stateMachineName ## _table)                                                                               \
@@ -192,7 +198,6 @@ namespace mpl = boost::mpl;
         {}                                                                                                      \
         void setDummyDevice(dummyDeviceType *_dev) {dev = _dev;}                                                \
         dummyDeviceType *dev;                                                                                   \
-        typedef dummyDeviceType devType;                                                                        \
     };                                                                                                          \
     typedef msm::back::state_machine<stateMachineName ## _> stateMachineName;
 
@@ -207,7 +212,10 @@ namespace mtca4u {
    *
    *  This class helps implementing dummy devices using a state machine and allows an easy connection with the physics
    *  simulation framework.
+   *
+   *  The physDummyDevice class is a template of the derived implementation, which means it follows a CRTP
    */
+  template<class derived>
   class physDummyDevice : public DummyDevice
   {
     public:
@@ -267,6 +275,9 @@ namespace mtca4u {
 
     protected:
 
+      /// define the dummyDeviceType used in the macros
+      typedef derived dummyDeviceType;
+
       /// trigger register-write events. Will be implemented using WRITE_EVENT_TABLE in the device implementation
       virtual void regWriteEvents(uint32_t regOffset, int32_t const *data, size_t size, uint8_t bar) = 0;
 
@@ -274,11 +285,15 @@ namespace mtca4u {
       virtual void regReadEvents(uint32_t regOffset, int32_t const *data, size_t size, uint8_t bar) = 0;
 
       /// timer class
-      template<class timerAction, class dummyDeviceType>
+      template<class timerEvent>
       class timer {
         public:
-          timer(dummyDeviceType *_dev) : dev(_dev),request(-1),current(0) {}
-          dummyDeviceType *dev;
+          timer() : dev(NULL),request(-1),current(0) {}
+
+          /// set dummy device. Must be done before calling advance().
+          void setDummyDevice(derived *_dev) {
+            dev = _dev;
+          }
 
           /// set the timer to fire in tval milliseconds
           void set(double tval) {
@@ -290,7 +305,7 @@ namespace mtca4u {
             current += tval;
             if(request > 0 && current >= request) {
               request = -1;
-              dev->theStateMachine.process_event( timerAction() );
+              dev->theStateMachine.process_event( timerEvent() );
               return true;
             }
             return false;
@@ -308,6 +323,9 @@ namespace mtca4u {
 
         protected:
 
+          /// the dummy device with the state machine
+          derived *dev;
+
           /// requested time
           double request;
 
@@ -315,35 +333,55 @@ namespace mtca4u {
           double current;
       };
 
-      /// timer group interface class
-      /// The implementation needs to be specific for all actual timer types
+      /// Timer group
+      /// The template argument timerSet must be a BOOST fusion set of all timers
+      template< class timerSet>
       class timerGroup {
         public:
-          timerGroup() : current(0) {}
-          virtual ~timerGroup() {}
+          timerGroup(derived *_dev)
+            : current(0),
+              minRemaining(0),
+              hasFired(false)
+          {
+            //if(names.size() != (unsigned int) size(timers)) throw("Size of name vector does not match size of timer set.");
+            boost::fusion::for_each(timers, setDummyDevice(_dev));
+          }
+          ~timerGroup() {}
 
-          /// advance the timer's current time by tval milliseconds. Returns true if any timer was fired
-          /// TODO must not advance more than getRemaining() at a time!
-          virtual bool advanceBy(double tval) {
-            current += tval;
-            return false;
+          /// obtains the timer matching the given type
+          template<class T>
+          T& get(T) {
+            return boost::fusion::at_key<T>(timers);
           }
 
           /// get remaining time until the next timer fires.
-          virtual double getRemaining() = 0;
+          double getRemaining() {
+            minRemaining = DBL_MAX;
+            boost::fusion::for_each(timers, findMinRemaining(this));
+            if(minRemaining >= DBL_MAX) minRemaining = -1;
+            return minRemaining;
+          }
+
+          /// advance the group to the next requested time of the given sub-timer. Returns true if any timer was fired.
+          template<class T>
+          bool advanceByTimer(T) {
+            T &timer = boost::fusion::at_key<T>(timers);
+            double tval = timer.getRemaining();
+            if(tval < 0) return false;
+            return advance(tval);
+          }
+
+          /// advance the timer's current time by tval milliseconds. Returns true if any timer was fired
+          bool advance(double tval) {
+            hasFired = false;
+            boost::fusion::for_each(timers, advanceTimer(this,tval));
+            return hasFired;
+          }
 
           /// advance the timer to the next requested time. Returns true if any timer was fired. Otherwise none of the
           /// timers was set and thus the current time remains unchanged
           bool advanceAll() {
-            return advanceBy(getRemaining());
-          }
-
-          /// advance the timer to the next requested time of the given sub-timer. Returns true if a timer was fired.
-          template<class T>
-          bool advanceSub(T timer) {
-              double tval = timer.getRemaining();
-              if(tval < 0) return false;
-              return advanceBy(tval);
+            return advance(getRemaining());
           }
 
           /// get current time (in milliseconds)
@@ -354,17 +392,66 @@ namespace mtca4u {
 
         protected:
 
+          /// functor to set the dummy device of a timer
+          struct setDummyDevice {
+            setDummyDevice(derived *_dev) : dev(_dev) {}
+              template<class T>
+              void operator()(T& t) const {
+                t.setDummyDevice(dev);
+              }
+            private:
+              derived *dev;
+          };
+
+          /// functor to find the minimum remaining time in all timers
+          struct findMinRemaining {
+            findMinRemaining(timerGroup<timerSet> *_group) : group(_group) {}
+              template<class T>
+              void operator()(T& t) const {
+                double r = t.getRemaining();
+                if(r > 0) group->minRemaining = fmin(group->minRemaining, r);
+              }
+            private:
+              timerGroup<timerSet> *group;
+          };
+
+          /// functor to advance a timer by the given milliseconds
+          struct advanceTimer {
+              advanceTimer(timerGroup<timerSet> *_group, double _tval) : group(_group), tval(_tval) {}
+              template<class T>
+              void operator()(T& t) const {
+                bool r;
+                r = t.advance(tval);
+                if(r) group->hasFired = true;
+              }
+            private:
+              timerGroup<timerSet> *group;
+              double tval;
+          };
+
+          /// fusion tuple of timers
+          timerSet timers;
+
+          /// vector of names
+          //std::vector<std::string> names;
+
           /// current time
           double current;
+
+          /// temporary field to determine the minimum remaining time (via findMinRemaining)
+          double minRemaining;
+
+          /// temporary field to determine if a timer has fired when using the advanceTimer functor
+          bool hasFired;
 
       };
 
       /// register accessors (should go into DummyDevice class later?)
-      template<typename T, class dummyDeviceType>
+      template<typename T>
       class dummyRegister {
         public:
 
-          void open(dummyDeviceType *dev, std::string module, std::string name)
+          void open(derived *dev, std::string module, std::string name)
           {
             _dev = dev;
             dev->_registerMapping->getRegisterInfo(name, elem, module);
@@ -393,8 +480,11 @@ namespace mtca4u {
 
         protected:
           mapFile::mapElem elem;
-          dummyDeviceType *_dev;
+          derived *_dev;
       };
+
+      /// handy name for the int32_t register accessor
+      typedef dummyRegister<int32_t> intRegister;
 
       /// last written data (into any register) and its size. Will be used in guard conditions.
       int32_t const *lastWrittenData;

@@ -146,11 +146,11 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
   // advance dummy strobe timing until buffer is full
   bool ERROR_FOUND = false;
   for(int i=0; i<65536; i++) {
-    _dummyDevice->timer.advanceSub(_dummyDevice->timer.strobe);
-    if( round(_dummyDevice->timer.strobe.getRemaining()*1000000.) != 20000 ) {
-      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timer.strobe.getRemaining()*1000000. << std::endl;
+    if( round(_dummyDevice->timers.getRemaining()*1000000.) != 20000 ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timers.getRemaining()*1000000. << std::endl;
       ERROR_FOUND = true;
     }
+    _dummyDevice->timers.advanceByTimer(ad16DummyDevice::timer<ad16DummyDevice::onStrobe>());
   }
   BOOST_CHECK( !ERROR_FOUND );
 
@@ -219,18 +219,18 @@ void DummyDeviceTest::testAutoTriggerMode() {
   _dummyMapped.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
 
   // check trigger timing
-  BOOST_CHECK( round(_dummyDevice->timer.trigger.getRemaining()*1000000.) == 1000000000. );
+  BOOST_CHECK( round(_dummyDevice->timers.get(ad16DummyDevice::timer<ad16DummyDevice::onTrigger>()).getRemaining()*1000000.) == 1000000000. );
 
   // wait until conversion is complete
   int currentBuffer;
   bool ERROR_FOUND = false;
   do {
     _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
-    _dummyDevice->timer.advanceSub(_dummyDevice->timer.strobe);
-    if( round(_dummyDevice->timer.strobe.getRemaining()*1000000.) != 10000 ) {
-      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timer.strobe.getRemaining()*1000000. << std::endl;
+    if( round(_dummyDevice->timers.getRemaining()*1000000.) != 10000 ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timers.getRemaining()*1000000. << std::endl;
       ERROR_FOUND = true;
     }
+    _dummyDevice->timers.advanceByTimer(ad16DummyDevice::timer<ad16DummyDevice::onStrobe>());
   } while(currentBuffer == lastBuffer);
   BOOST_CHECK( !ERROR_FOUND );
 

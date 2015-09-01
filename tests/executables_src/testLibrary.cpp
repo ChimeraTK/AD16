@@ -262,7 +262,7 @@ void Ad16Test::testSoftwareTriggeredMode() {
   ad.enableDaq();
 
   // wait until conversion is complete
-  for(int i=0; i<65536; i++) ad._dummyDevice->timer.advanceAll();
+  for(int i=0; i<65536; i++) ad._dummyDevice->timers.advanceAll();
 
   // send another trigger to swap the buffers
   ad.sendUserTrigger();
@@ -297,7 +297,7 @@ void Ad16Test::testPeriodicTriggeredMode() {
   ad.enableDaq();
 
   // wait until conversion is complete
-  while(!ad.conversionComplete()) ad._dummyDevice->timer.advanceAll();
+  while(!ad.conversionComplete()) ad._dummyDevice->timers.advanceAll();
 
   // read data
   ad.read();
