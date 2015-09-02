@@ -5,11 +5,13 @@
 #include <float.h>
 #include <math.h>
 
-#include <physDummyDevice.h>
+#include <mtca4uVirtualLab/VirtualDevice.h>
 #include <boost/random/mersenne_twister.hpp>
 
 namespace msm = boost::msm;
 namespace mpl = boost::mpl;
+
+using namespace mtca4u::VirtualLab;
 
 namespace mtca4u {
 
@@ -18,7 +20,7 @@ namespace mtca4u {
    *  implements all registers defined in the mapping file in memory.
    *  Like this it mimics the real PCIe device.
    */
-  class ad16DummyDevice : public physDummyDevice<ad16DummyDevice>
+  class ad16DummyDevice : public VirtualDevice<ad16DummyDevice>
   {
     public:
 
@@ -43,7 +45,7 @@ namespace mtca4u {
       virtual void openDev(const std::string &mappingFileName, int perm=O_RDWR, devConfigBase *pConfig=NULL) {
 
         // open the underlying dummy device
-        physDummyDevice::openDev(mappingFileName, perm, pConfig);
+        VirtualDevice::openDev(mappingFileName, perm, pConfig);
 
         // send onDeviceOpen event
         theStateMachine.process_event(onDeviceOpen());
@@ -68,7 +70,7 @@ namespace mtca4u {
 
       /// on device close: fire the device-close event
       virtual void closeDev() {
-        physDummyDevice::closeDev();
+        VirtualDevice::closeDev();
         theStateMachine.process_event(onDeviceClose());
       }
 

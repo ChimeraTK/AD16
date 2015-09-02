@@ -25,6 +25,9 @@ include_directories(SYSTEM ${MtcaMappedDevice_INCLUDE_DIRS})
 FIND_PACKAGE(mtca4uPy 00.01 REQUIRED)
 include_directories(SYSTEM ${mtca4uPy_INCLUDE_DIRS})
 
+FIND_PACKAGE(mtca4uVirtualLab 00.01 REQUIRED)
+include_directories(SYSTEM ${mtca4uVirtualLab_INCLUDE_DIRS})
+
 FIND_PACKAGE(Boost COMPONENTS thread python REQUIRED)
 
 #For some reason the system library has to be mentioned explicitly to the linker.
