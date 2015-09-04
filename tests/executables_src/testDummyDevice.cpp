@@ -150,7 +150,7 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
       if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timers.getRemaining()*1000000. << std::endl;
       ERROR_FOUND = true;
     }
-    _dummyDevice->timers.advanceByTimer(ad16DummyDevice::timer<ad16DummyDevice::onStrobe>());
+    _dummyDevice->timers.advance("strobe");
   }
   BOOST_CHECK( !ERROR_FOUND );
 
@@ -219,7 +219,7 @@ void DummyDeviceTest::testAutoTriggerMode() {
   _dummyMapped.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
 
   // check trigger timing
-  BOOST_CHECK( round(_dummyDevice->timers.get(ad16DummyDevice::timer<ad16DummyDevice::onTrigger>()).getRemaining()*1000000.) == 1000000000. );
+  BOOST_CHECK( round(_dummyDevice->trigger.getRemaining()*1000000.) == 1000000000. );
 
   // wait until conversion is complete
   int currentBuffer;
@@ -230,7 +230,7 @@ void DummyDeviceTest::testAutoTriggerMode() {
       if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timers.getRemaining()*1000000. << std::endl;
       ERROR_FOUND = true;
     }
-    _dummyDevice->timers.advanceByTimer(ad16DummyDevice::timer<ad16DummyDevice::onStrobe>());
+    _dummyDevice->timers.advance("strobe");
   } while(currentBuffer == lastBuffer);
   BOOST_CHECK( !ERROR_FOUND );
 

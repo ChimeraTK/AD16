@@ -25,6 +25,8 @@ namespace mtca4u {
     public:
 
       ad16DummyDevice() :
+        strobe(this),
+        trigger(this),
         timers(this),
         theStateMachine(this),
         uniform(0, (1<<18) - 1),    // 18 bit random number
@@ -85,8 +87,9 @@ namespace mtca4u {
       DECLARE_EVENT(onStrobe)
 
       /// timer group
-      typedef timerGroup< set< timer<onStrobe>, timer<onTrigger> > > ad16TimerGroup;
-      ad16TimerGroup timers;
+      DECLARE_TIMER(strobe, onStrobe)
+      DECLARE_TIMER(trigger, onTrigger)
+      DECLARE_TIMER_GROUP(timers, strobe, trigger)
 
       /// register read/write events
       DECLARE_EVENT(onWriteDaqEnable)
@@ -134,15 +137,13 @@ namespace mtca4u {
       DECLARE_ACTION(setTriggerTimer,
         int trig = dev->regTrigSel.get();
         int fdiv = dev->regTrigFreq.get(trig);
-        dev->timers.get(timer<onTrigger>()).set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
-        //dev->timer.trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        dev->trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
       )
 
       /// action: set the strobe timer
       DECLARE_ACTION(setStrobeTimer,
         int fdiv = dev->regSamplingFreqA.get();
-      dev->timers.get(timer<onStrobe>()).set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
-        //dev->timer.strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        dev->strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
       )
 
       /// action: fill a single sample per channel into the buffer
