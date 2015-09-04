@@ -3,7 +3,6 @@
 
 #include <string>
 #include <vector>
-#include <boost/python.hpp>
 #include <boost/any.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
@@ -12,6 +11,10 @@
 
 #include "ad16DummyDevice.h"
 #include "ad16Exception.h"
+
+#ifdef ENABLE_PYTHON_BINDINGS
+#include <boost/python.hpp>
+#endif
 
 namespace mtca4u {
 
@@ -107,8 +110,12 @@ namespace mtca4u {
       /// Get data for single channel after a previous read()
       std::vector<int32_t> getChannelData(unsigned int channel);
 
+#ifdef ENABLE_PYTHON_BINDINGS
+
       /// Get data for single channel after a previous read(). Version for Python with numpy array
       void getChannelDataNumpy(unsigned int channel, boost::python::numeric::array &numpyArray);
+
+#endif
 
     protected:
 

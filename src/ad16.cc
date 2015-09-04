@@ -5,8 +5,11 @@
 #include <MtcaMappedDevice/mapFile.h>
 #include <MtcaMappedDevice/dmapFile.h>
 #include <MtcaMappedDevice/exlibmap.h>
-#include <mtca4upy/HelperFunctions.h>
 #include <cstring>
+
+#ifdef ENABLE_PYTHON_BINDINGS
+#include <mtca4upy/HelperFunctions.h>
+#endif
 
 namespace mtca4u {
 
@@ -381,6 +384,7 @@ namespace mtca4u {
 
   }
 
+#ifdef ENABLE_PYTHON_BINDINGS
   /*************************************************************************************************/
   void ad16::getChannelDataNumpy(unsigned int channel, boost::python::numeric::array &numpyArray) {
 
@@ -397,6 +401,7 @@ namespace mtca4u {
     else {
       throw mtca4upy::ArrayElementTypeNotSupported("getChannelData(): Incorrect data type found in numpy array.");
     }
+#endif
 
   }
 

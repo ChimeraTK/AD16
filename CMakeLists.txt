@@ -22,13 +22,10 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--export-dynamic
 FIND_PACKAGE(MtcaMappedDevice 00.17 REQUIRED)
 include_directories(SYSTEM ${MtcaMappedDevice_INCLUDE_DIRS})
 
-FIND_PACKAGE(mtca4uPy 00.01 REQUIRED)
-include_directories(SYSTEM ${mtca4uPy_INCLUDE_DIRS})
-
 FIND_PACKAGE(mtca4uVirtualLab 00.01 REQUIRED)
 include_directories(SYSTEM ${mtca4uVirtualLab_INCLUDE_DIRS})
 
-FIND_PACKAGE(Boost COMPONENTS thread python REQUIRED)
+FIND_PACKAGE(Boost COMPONENTS thread REQUIRED)
 
 #For some reason the system library has to be mentioned explicitly to the linker.
 #This is strange because the thead library has it as a dependency.
@@ -40,20 +37,34 @@ ELSE(Boost_UNIT_TEST_FRAMEWORK_FOUND)
   message("Boost unit_test_framework not found, disabling testing")
 ENDIF(Boost_UNIT_TEST_FRAMEWORK_FOUND)
 
-FIND_PACKAGE(PythonLibs REQUIRED)
-include_directories( ${PYTHON_INCLUDE_DIRS} )
+
+FIND_PACKAGE(mtca4uPy 00.01)
+include_directories(SYSTEM ${mtca4uPy_INCLUDE_DIRS})
+IF(mtca4uPy_FOUND)
+  set(PYTHON_IS_ENABLED "true")
+  FIND_PACKAGE(PythonLibs REQUIRED)
+  FIND_PACKAGE(Boost COMPONENTS python REQUIRED)
+  include_directories( ${PYTHON_INCLUDE_DIRS} )
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_PYTHON_BINDINGS")
+ELSE(mtca4uPy_FOUND)
+  message("Python libraries not found, disabling Python bindings")
+ENDIF(mtca4uPy_FOUND)
+
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 set(${PROJECT_NAME}_INCLUDE_DIRS ${${PROJECT_NAME}_INCLUDE_DIRS} ${CMAKE_SOURCE_DIR}/include/)
+
 aux_source_directory(${CMAKE_SOURCE_DIR}/src library_sources)
 
 MACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
   foreach( FILE_TO_COPY ad16_scope_fmc25_r1224.mapp )
     configure_file( tests/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
   endforeach( FILE_TO_COPY )
-  foreach( FILE_TO_COPY ad16.dmap ADC_scope.py )
-    configure_file( examples/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
-  endforeach( FILE_TO_COPY )
+  if(PYTHON_IS_ENABLED)
+    foreach( FILE_TO_COPY ad16.dmap ADC_scope.py )
+      configure_file( examples/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
+    endforeach( FILE_TO_COPY )
+  endif(PYTHON_IS_ENABLED)
 ENDMACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
 
 #Create the executables for automated unit testing.

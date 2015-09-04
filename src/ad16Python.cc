@@ -1,3 +1,5 @@
+#ifdef ENABLE_PYTHON_BINDINGS
+
 #include <vector>
 #include <boost/python.hpp>
 #include <boost/noncopyable.hpp>
@@ -85,3 +87,5 @@ BOOST_PYTHON_MODULE(libad16)
   register_exception_translator<ad16Exception>(&translateAd16Exception);
 
 }
+
+#endif
