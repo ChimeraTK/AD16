@@ -44,10 +44,10 @@ namespace mtca4u {
       virtual ~ad16DummyDevice() {}
 
       /// on device open: fire the device-open event
-      virtual void openDev(const std::string &mappingFileName, int perm=O_RDWR, devConfigBase *pConfig=NULL) {
+      virtual void open(const std::string &mappingFileName, int perm=O_RDWR, DeviceConfigBase *pConfig=NULL) {
 
         // open the underlying dummy device
-        VirtualDevice::openDev(mappingFileName, perm, pConfig);
+        VirtualDevice::open(mappingFileName, perm, pConfig);
 
         // send onDeviceOpen event
         theStateMachine.process_event(onDeviceOpen());
@@ -71,8 +71,8 @@ namespace mtca4u {
       }
 
       /// on device close: fire the device-close event
-      virtual void closeDev() {
-        VirtualDevice::closeDev();
+      virtual void close() {
+        VirtualDevice::close();
         theStateMachine.process_event(onDeviceClose());
       }
 

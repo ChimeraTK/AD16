@@ -6,7 +6,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include <MtcaMappedDevice/devMap.h>
+#include <MtcaMappedDevice/MappedDevice.h>
 
 #include "ad16DummyDevice.h"
 
@@ -44,7 +44,7 @@ class DummyDeviceTest {
   private:
     //TestableDummyDevice _dummyDevice;
     boost::shared_ptr<TestableDummyDevice> _dummyDevice;
-    devMap<devBase> _dummyMapped;
+    MappedDevice<BaseDevice> _dummyMapped;
     void openDevice();
     friend class DummyDeviceTestSuite;
 
@@ -73,8 +73,8 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/ [] )
 
 /**********************************************************************************************************************/
 void DummyDeviceTest::openDevice() {
-  _dummyDevice->openDev(TEST_MAPPING_FILE);
-  _dummyMapped.openDev( _dummyDevice, _dummyDevice->_registerMapping);
+  _dummyDevice->open(TEST_MAPPING_FILE);
+  _dummyMapped.open( _dummyDevice, _dummyDevice->_registerMapping);
 }
 
 /**********************************************************************************************************************/
@@ -82,37 +82,37 @@ void DummyDeviceTest::testExceptions() {
   std::cout << "testExceptions" << std::endl;
 
   // close the not opened device
-  BOOST_CHECK_THROW( _dummyDevice->closeDev(), DummyDeviceException);
+  BOOST_CHECK_THROW( _dummyDevice->close(), DummyDeviceException);
   try {
-    _dummyDevice->closeDev();
+    _dummyDevice->close();
   }
   catch(DummyDeviceException &a) {
     BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_CLOSED);
   }
 
   // open twice
-  _dummyDevice->openDev(TEST_MAPPING_FILE);
-  BOOST_CHECK_THROW( _dummyDevice->openDev(TEST_MAPPING_FILE), DummyDeviceException);
+  _dummyDevice->open(TEST_MAPPING_FILE);
+  BOOST_CHECK_THROW( _dummyDevice->open(TEST_MAPPING_FILE), DummyDeviceException);
   try {
-    _dummyDevice->openDev(TEST_MAPPING_FILE);
+    _dummyDevice->open(TEST_MAPPING_FILE);
   }
   catch(DummyDeviceException &a) {
     BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_OPEN);
   }
 
   // close again
-  _dummyDevice->closeDev();
+  _dummyDevice->close();
 
   // open it now, should not throw an exception
-  _dummyDevice->openDev(TEST_MAPPING_FILE);
+  _dummyDevice->open(TEST_MAPPING_FILE);
 
   // close again
-  _dummyDevice->closeDev();
+  _dummyDevice->close();
 
   // close the not opened device again
-  BOOST_CHECK_THROW( _dummyDevice->closeDev(), DummyDeviceException);
+  BOOST_CHECK_THROW( _dummyDevice->close(), DummyDeviceException);
   try {
-    _dummyDevice->closeDev();
+    _dummyDevice->close();
   }
   catch(DummyDeviceException &a) {
     BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_CLOSED);
@@ -189,7 +189,7 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
   }
   BOOST_CHECK( !ERROR_FOUND );
 
-  _dummyMapped.closeDev();
+  _dummyMapped.close();
 }
 /**********************************************************************************************************************/
 void DummyDeviceTest::testAutoTriggerMode() {
@@ -260,5 +260,5 @@ void DummyDeviceTest::testAutoTriggerMode() {
   }
   BOOST_CHECK( !ERROR_FOUND );
 
-  _dummyMapped.closeDev();
+  _dummyMapped.close();
 }

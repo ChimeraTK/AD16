@@ -197,7 +197,7 @@ void Ad16Test::testExceptions() {
 /**********************************************************************************************************************/
 void Ad16Test::testTriggerModes() {
   std::cout << "testTriggerModes" << std::endl;
-  mapFile::mapElem elem;
+  RegisterInfoMap::RegisterInfo elem;
   int32_t val;
 
   // open device

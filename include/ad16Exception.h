@@ -1,13 +1,13 @@
 #ifndef MTCA4U_AD16_EXCEPTION_H
 #define MTCA4U_AD16_EXCEPTION_H
 
-#include <MtcaMappedDevice/exBase.h>
+#include <MtcaMappedDevice/Exception.h>
 
 namespace mtca4u
 {
   /** The type of exception thrown by ad16.
    */
-  class ad16Exception: public mtca4u::exBase {
+  class ad16Exception: public mtca4u::Exception {
     public:
 
       /** The different error types of the ad16Exception.
@@ -25,7 +25,7 @@ namespace mtca4u
       };
 
       ad16Exception(const std::string & message, unsigned int id):
-        exBase(message, id) {}
+        Exception(message, id) {}
       virtual ~ad16Exception() throw(){}
   };
 

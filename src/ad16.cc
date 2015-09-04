@@ -1,11 +1,14 @@
-#include "ad16.h"
-#include <boost/utility/binary.hpp>
-#include <MtcaMappedDevice/DummyDevice.h>
-#include <MtcaMappedDevice/mapFileParser.h>
-#include <MtcaMappedDevice/mapFile.h>
-#include <MtcaMappedDevice/dmapFile.h>
-#include <MtcaMappedDevice/exlibmap.h>
 #include <cstring>
+#include <boost/utility/binary.hpp>
+
+#include <MtcaMappedDevice/DummyDevice.h>
+#include <MtcaMappedDevice/MapFileParser.h>
+#include <MtcaMappedDevice/MapFile.h>
+#include <MtcaMappedDevice/DMapFile.h>
+#include <MtcaMappedDevice/MapException.h>
+#include <MtcaMappedDevice/PcieDeviceException.h>
+
+#include "ad16.h"
 
 #ifdef ENABLE_PYTHON_BINDINGS
 #include <mtca4upy/HelperFunctions.h>
@@ -23,13 +26,13 @@ namespace mtca4u {
   void ad16::openDmap(const std::string &dmapFileName, const std::string &deviceAlias) {
 
     // parse the dmap file and find the correct element
-    dmapFile::dmapElem elem;
+    DMapFile::dRegisterInfo elem;
     try {
-      mtca4u::dmapFilesParser parser;
+      mtca4u::DMapFilesParser parser;
       parser.parse_file(dmapFileName);
       elem = parser.getdMapFileElem(deviceAlias);
     }
-    catch(exLibMap &e) {
+    catch(LibMapException &e) {
       throw ad16Exception(std::string("Device cannot be found: ")+e.what(),ad16Exception::CANNOT_OPEN);
     }
 
@@ -51,27 +54,27 @@ namespace mtca4u {
 
       // create the dummy device driver
       _dummyDevice = boost::shared_ptr<ad16DummyDevice>( new ad16DummyDevice );
-      _dummyDevice->openDev(mappingFileName);
+      _dummyDevice->open(mappingFileName);
 
       // create mapped device
-      _mappedDevice = boost::shared_ptr< devMap<devBase> >( new devMap<devBase> );
-      _mappedDevice->openDev( _dummyDevice, _map);
+      _mappedDevice = boost::shared_ptr< MappedDevice<BaseDevice> >( new MappedDevice<BaseDevice> );
+      _mappedDevice->open(  boost::static_pointer_cast<BaseDevice>(_dummyDevice), _map);
     }
     // open real device
     else {
 
       // create the PCIe device driver
       try {
-        _realDevice = boost::shared_ptr<devPCIE>( new devPCIE );
-        _realDevice->openDev(deviceFileName);
+        _realDevice = boost::shared_ptr<PcieDevice>( new PcieDevice );
+        _realDevice->open(deviceFileName);
       }
-      catch(exDevPCIE &e) {
+      catch(PcieDeviceException &e) {
         throw ad16Exception(std::string("PICe device cannot be opened: ")+e.what(),ad16Exception::CANNOT_OPEN);
       }
 
       // create mapped device
-      _mappedDevice = boost::shared_ptr< devMap<devBase> >( new devMap<devBase> );
-      _mappedDevice->openDev( _realDevice, _map);
+      _mappedDevice = boost::shared_ptr< MappedDevice<BaseDevice> >( new MappedDevice<BaseDevice> );
+      _mappedDevice->open( _realDevice, _map);
 
     }
 
@@ -139,7 +142,7 @@ namespace mtca4u {
     if(!_isOpen) throw ad16Exception("Device not opened.",ad16Exception::NOT_OPENED);
 
     // close device
-    _mappedDevice->closeDev();
+    _mappedDevice->close();
     _isOpen = false;
   }
 
@@ -351,7 +354,7 @@ namespace mtca4u {
     }
 
     // modify register map so the DMA area has the right length
-    for(mapFile::iterator i = _map->begin(); i != _map->end(); ++i) {
+    for(RegisterInfoMap::iterator i = _map->begin(); i != _map->end(); ++i) {
       if(i->reg_module == "APP0" && i->reg_name == "AREA_MULTIPLEXED_SEQUENCE_"+bufferName) {
         i->reg_elem_nr = _numberOfChannels*_samplesPerBlock;
         i->reg_size = sizeof(int32_t)*i->reg_elem_nr;
@@ -401,8 +404,8 @@ namespace mtca4u {
     else {
       throw mtca4upy::ArrayElementTypeNotSupported("getChannelData(): Incorrect data type found in numpy array.");
     }
-#endif
 
   }
+#endif
 
 } // namespace mtca4u
