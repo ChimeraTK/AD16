@@ -206,41 +206,41 @@ void Ad16Test::testTriggerModes() {
   // test periodic trigger mode
   ad.setTriggerMode(ad16::PERIODIC,1.);
   ad._map->getRegisterInfo("WORD_TIMING_TRG_SEL", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( val == 0 );
   ad._map->getRegisterInfo("WORD_TIMING_INT_ENA", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( (val & (1<<0)) != 0 );
   ad._map->getRegisterInfo("WORD_TIMING_FREQ", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( val == 49999999 );               // 1 Hz
 
   // test user trigger mode
   ad.setTriggerMode(ad16::USER);
   ad._map->getRegisterInfo("WORD_TIMING_TRG_SEL", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( val == 8 );
   ad._map->getRegisterInfo("WORD_TIMING_INT_ENA", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( (val & (1<<8)) == 0 );
 
   // test external trigger mode on channel 3
   ad.setTriggerMode(ad16::EXTERNAL,3);
   ad._map->getRegisterInfo("WORD_TIMING_TRG_SEL", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( val == 3 );
   ad._map->getRegisterInfo("WORD_TIMING_INT_ENA", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( (val & (1<<3)) == 0 );
 
   // test external trigger mode on channel 0 after the PERIODIC trigger was enabled (they are on the same channel)
   ad.setTriggerMode(ad16::PERIODIC,1.);
   ad.setTriggerMode(ad16::EXTERNAL,0);
   ad._map->getRegisterInfo("WORD_TIMING_TRG_SEL", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( val == 0 );
   ad._map->getRegisterInfo("WORD_TIMING_INT_ENA", elem, "APP0");
-  ad._dummyDevice->readReg(elem.reg_address,&val,elem.reg_bar);
+  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
   BOOST_CHECK( (val & (1<<0)) == 0 );
 
   // close device

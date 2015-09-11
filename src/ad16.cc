@@ -57,7 +57,7 @@ namespace mtca4u {
       _dummyDevice->open(mappingFileName);
 
       // create mapped device
-      _mappedDevice = boost::shared_ptr< MappedDevice<BaseDevice> >( new MappedDevice<BaseDevice> );
+      _mappedDevice = boost::shared_ptr< MappedDevice >( new MappedDevice );
       _mappedDevice->open(  boost::static_pointer_cast<BaseDevice>(_dummyDevice), _map);
     }
     // open real device
@@ -73,7 +73,7 @@ namespace mtca4u {
       }
 
       // create mapped device
-      _mappedDevice = boost::shared_ptr< MappedDevice<BaseDevice> >( new MappedDevice<BaseDevice> );
+      _mappedDevice = boost::shared_ptr< MappedDevice >( new MappedDevice );
       _mappedDevice->open( _realDevice, _map);
 
     }

@@ -126,7 +126,7 @@ namespace mtca4u {
       boost::shared_ptr<RegisterInfoMap> _map;
 
       /// our mapped device
-      boost::shared_ptr< MappedDevice<BaseDevice> > _mappedDevice;
+      boost::shared_ptr< MappedDevice > _mappedDevice;
 
       /// pointer to dummy device (if used)
       boost::shared_ptr<ad16DummyDevice> _dummyDevice;

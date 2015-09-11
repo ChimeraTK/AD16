@@ -44,7 +44,7 @@ class DummyDeviceTest {
   private:
     //TestableDummyDevice _dummyDevice;
     boost::shared_ptr<TestableDummyDevice> _dummyDevice;
-    MappedDevice<BaseDevice> _dummyMapped;
+    MappedDevice _dummyMapped;
     void openDevice();
     friend class DummyDeviceTestSuite;
 
