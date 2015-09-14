@@ -57,11 +57,11 @@ set(${PROJECT_NAME}_INCLUDE_DIRS ${${PROJECT_NAME}_INCLUDE_DIRS} ${CMAKE_SOURCE_
 aux_source_directory(${CMAKE_SOURCE_DIR}/src library_sources)
 
 MACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
-  foreach( FILE_TO_COPY ad16_scope_fmc25_r1224.mapp )
+  foreach( FILE_TO_COPY ad16.dmap ad16_scope_fmc25_r1224.mapp )
     configure_file( tests/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
   endforeach( FILE_TO_COPY )
   if(PYTHON_IS_ENABLED)
-    foreach( FILE_TO_COPY ad16.dmap ADC_scope.py )
+    foreach( FILE_TO_COPY ADC_scope.py )
       configure_file( examples/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
     endforeach( FILE_TO_COPY )
   endif(PYTHON_IS_ENABLED)
