@@ -53,8 +53,8 @@ namespace mtca4u {
     if(deviceFileName == mappingFileName){
 
       // create the dummy device driver
-      _dummyDevice = boost::shared_ptr<ad16DummyDevice>( new ad16DummyDevice );
-      _dummyDevice->open(mappingFileName);
+      _dummyDevice = boost::shared_ptr<ad16DummyDevice>(
+          new ad16DummyDevice(".",mappingFileName,std::list<std::string>()) );
 
       // create mapped device
       _mappedDevice = boost::shared_ptr< MappedDevice >( new MappedDevice );
@@ -65,8 +65,7 @@ namespace mtca4u {
 
       // create the PCIe device driver
       try {
-        _realDevice = boost::shared_ptr<PcieDevice>( new PcieDevice );
-        _realDevice->open(deviceFileName);
+        _realDevice = boost::shared_ptr<PcieDevice>( new PcieDevice(".",deviceFileName,std::list<std::string>()) );
       }
       catch(PcieDeviceException &e) {
         throw ad16Exception(std::string("PICe device cannot be opened: ")+e.what(),ad16Exception::CANNOT_OPEN);

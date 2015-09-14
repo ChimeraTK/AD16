@@ -82,15 +82,6 @@ void Ad16Test::testExceptions() {
     BOOST_CHECK( a.getID() == ad16Exception::NOT_OPENED);
   }
 
-  // open /dev/null as device
-  BOOST_CHECK_THROW( ad.open("/dev/null",TEST_MAPPING_FILE) , ad16Exception);
-  try {
-    ad.open("/dev/null",TEST_MAPPING_FILE);
-  }
-  catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::CANNOT_OPEN);
-  }
-
   // open non-existing dmap file
   BOOST_CHECK_THROW( ad.openDmap("this_file_does_not_exist","AD16") , ad16Exception);
   try {
@@ -101,10 +92,10 @@ void Ad16Test::testExceptions() {
   }
 
   // open dummy-PCIe device (wrong type of PCIe device)
-  BOOST_CHECK_THROW( ad.open("/dev/mtcadummys0",TEST_MAPPING_FILE) , ad16Exception);
+  BOOST_CHECK_THROW( ad.open("mtcadummys0",TEST_MAPPING_FILE) , ad16Exception);
   ad.close();
   try {
-    ad.open("/dev/mtcadummys0",TEST_MAPPING_FILE);
+    ad.open("mtcadummys0",TEST_MAPPING_FILE);
   }
   catch(ad16Exception &a) {
     BOOST_CHECK( a.getID() == ad16Exception::CANNOT_OPEN);

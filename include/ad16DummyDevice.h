@@ -24,7 +24,8 @@ namespace mtca4u {
   {
     public:
 
-      ad16DummyDevice() :
+      ad16DummyDevice(std::string host, std::string instance, std::list< std::string > parameters) :
+        VirtualDevice(host,instance,parameters),
         strobe(this),
         trigger(this),
         timers(this),
@@ -42,6 +43,12 @@ namespace mtca4u {
       }
 
       virtual ~ad16DummyDevice() {}
+
+
+      virtual void open() {
+        DummyDevice::open();
+      }
+
 
       /// on device open: fire the device-open event
       virtual void open(const std::string &mappingFileName, int perm=O_RDWR, DeviceConfigBase *pConfig=NULL) {

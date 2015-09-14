@@ -27,6 +27,9 @@ class DummyDeviceTest;
  */
 class TestableDummyDevice : public ad16DummyDevice
 {
+    TestableDummyDevice(std::string host, std::string instance, std::list< std::string > parameters)
+    : ad16DummyDevice(host, instance, parameters)
+    {}
     friend class DummyDeviceTest;
 };
 
@@ -34,7 +37,8 @@ class TestableDummyDevice : public ad16DummyDevice
 class DummyDeviceTest {
   public:
     DummyDeviceTest() {
-      _dummyDevice = boost::shared_ptr<TestableDummyDevice>( new TestableDummyDevice() );
+      _dummyDevice = boost::shared_ptr<TestableDummyDevice>(
+          new TestableDummyDevice(".",TEST_MAPPING_FILE,std::list<std::string>()));
     }
 
     void testExceptions();
@@ -45,6 +49,7 @@ class DummyDeviceTest {
     //TestableDummyDevice _dummyDevice;
     boost::shared_ptr<TestableDummyDevice> _dummyDevice;
     MappedDevice _dummyMapped;
+    ptrmapFile _registerMapping;
     void openDevice();
     friend class DummyDeviceTestSuite;
 
@@ -73,8 +78,9 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/ [] )
 
 /**********************************************************************************************************************/
 void DummyDeviceTest::openDevice() {
-  _dummyDevice->open(TEST_MAPPING_FILE);
-  _dummyMapped.open( _dummyDevice, _dummyDevice->_registerMapping);
+  //_dummyDevice->open();
+  _registerMapping = mapFileParser().parse(TEST_MAPPING_FILE);
+  _dummyMapped.open( _dummyDevice, _registerMapping);
 }
 
 /**********************************************************************************************************************/
