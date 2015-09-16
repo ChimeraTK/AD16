@@ -1,12 +1,7 @@
 #include <cstring>
 #include <boost/utility/binary.hpp>
 
-#include <MtcaMappedDevice/DummyDevice.h>
-#include <MtcaMappedDevice/MapFileParser.h>
-#include <MtcaMappedDevice/MapFile.h>
-#include <MtcaMappedDevice/DMapFile.h>
-#include <MtcaMappedDevice/MapException.h>
-#include <MtcaMappedDevice/PcieDeviceException.h>
+#include <MtcaMappedDevice/PcieBackendException.h>
 
 #include "ad16.h"
 
@@ -57,22 +52,22 @@ namespace mtca4u {
           new ad16DummyDevice(".",mappingFileName,std::list<std::string>()) );
 
       // create mapped device
-      _mappedDevice = boost::shared_ptr< MappedDevice >( new MappedDevice );
-      _mappedDevice->open(  boost::static_pointer_cast<BaseDevice>(_dummyDevice), _map);
+      _mappedDevice = boost::shared_ptr<Device>(new Device);
+      _mappedDevice->open(boost::static_pointer_cast<DeviceBackend>(_dummyDevice), _map);
     }
     // open real device
     else {
 
       // create the PCIe device driver
       try {
-        _realDevice = boost::shared_ptr<PcieDevice>( new PcieDevice(".",deviceFileName,std::list<std::string>()) );
+        _realDevice = boost::shared_ptr<PcieBackend>( new PcieBackend(".",deviceFileName,std::list<std::string>()) );
       }
-      catch(PcieDeviceException &e) {
-        throw ad16Exception(std::string("PICe device cannot be opened: ")+e.what(),ad16Exception::CANNOT_OPEN);
+      catch(PcieBackendException &e) {
+        throw ad16Exception(std::string("PICe device cannot be opened: ")+e.what(), ad16Exception::CANNOT_OPEN);
       }
 
       // create mapped device
-      _mappedDevice = boost::shared_ptr< MappedDevice >( new MappedDevice );
+      _mappedDevice = boost::shared_ptr<Device>(new Device);
       _mappedDevice->open( _realDevice, _map);
 
     }
@@ -88,7 +83,7 @@ namespace mtca4u {
       _mappedDevice->getRegisterAccessor("WORD_AD16_ENA","AD160")->write(0);
     }
     catch(std::exception &e) {
-      throw ad16Exception(e.what(),ad16Exception::CANNOT_OPEN);
+      throw ad16Exception(e.what() ,ad16Exception::CANNOT_OPEN);
     }
 
     // read clock frequency
@@ -96,7 +91,7 @@ namespace mtca4u {
 
     // safety-check: clock frequency must be at a reasonable value.
     if(clock_frequency[0] < 1000 || clock_frequency[1] < 1000) {
-      throw ad16Exception("Device reports unreasonable base clock frequencies.",ad16Exception::CANNOT_OPEN);
+      throw ad16Exception("Device reports unreasonable base clock frequencies.", ad16Exception::CANNOT_OPEN);
     }
 
     // set default sampling frequency to 100kHz and oversampling ratio of 2

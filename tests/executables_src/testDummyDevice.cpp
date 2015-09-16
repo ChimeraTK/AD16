@@ -6,7 +6,7 @@
 #include <boost/make_shared.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include <MtcaMappedDevice/MappedDevice.h>
+#include <MtcaMappedDevice/Device.h>
 
 #include "ad16DummyDevice.h"
 
@@ -48,7 +48,7 @@ class DummyDeviceTest {
   private:
     //TestableDummyDevice _dummyDevice;
     boost::shared_ptr<TestableDummyDevice> _dummyDevice;
-    MappedDevice _dummyMapped;
+    Device _dummyMapped;
     ptrmapFile _registerMapping;
     void openDevice();
     friend class DummyDeviceTestSuite;

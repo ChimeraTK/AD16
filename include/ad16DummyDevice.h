@@ -46,7 +46,7 @@ namespace mtca4u {
 
 
       virtual void open() {
-        DummyDevice::open();
+        VirtualDevice::open();
       }
 
 
@@ -105,13 +105,13 @@ namespace mtca4u {
       DECLARE_EVENT(onWriteTrigFreq)
 
       /// register accessors
-      intRegister regTrigSel;           // APP0.WORD_TIMING_TRG_SEL
-      intRegister regTrigFreq;          // APP0.WORD_TIMING_FREQ
-      intRegister regSamplingFreqA;     // AD160.WORD_ADC_A_TIMING_DIV
-      intRegister regBufferA;           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA
-      intRegister regBufferB;           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB
-      intRegister regCurBuffer;         // APP0.WORD_DAQ_CURR_BUF
-      intRegister regBaseClockFreq;     // AD160.WORD_CLK_FREQ
+      DECLARE_REGISTER(int, regTrigSel)           // APP0.WORD_TIMING_TRG_SEL
+      DECLARE_REGISTER(int, regTrigFreq)          // APP0.WORD_TIMING_FREQ
+      DECLARE_REGISTER(int, regSamplingFreqA)     // AD160.WORD_ADC_A_TIMING_DIV
+      DECLARE_REGISTER(int, regBufferA)           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA
+      DECLARE_REGISTER(int, regBufferB)           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB
+      DECLARE_REGISTER(int, regCurBuffer)         // APP0.WORD_DAQ_CURR_BUF
+      DECLARE_REGISTER(int, regBaseClockFreq)     // AD160.WORD_CLK_FREQ
 
       /// connect on-write events with register names
       WRITE_EVENT_TABLE(
@@ -157,14 +157,6 @@ namespace mtca4u {
       DECLARE_ACTION(fillBuffer,
         // do nothing if buffer is already full
         if(dev->currentOffset >= numberOfSamples) return;
-        // determine buffer to write to
-        intRegister *acc;
-        if(dev->currentBuffer == 0) {
-          acc = &dev->regBufferA;
-        }
-        else {
-          acc = &dev->regBufferB;
-        }
         // fill the buffer
         for(int ic=0; ic<numberOfChannels; ic++) {
           int32_t ival;
@@ -184,7 +176,13 @@ namespace mtca4u {
             ival = dev->uniform(dev->rng);
           }
           int ioffset = dev->currentOffset*numberOfChannels + ic;
-          acc->set(ival, ioffset);
+          // write to the right buffer
+          if(dev->currentBuffer == 0) {
+            dev->regBufferA[ioffset] = ival;
+          }
+          else {
+            dev->regBufferB[ioffset] = ival;
+          }
         }
         // increment the offset
         dev->currentOffset++;

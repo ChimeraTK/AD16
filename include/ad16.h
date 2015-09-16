@@ -6,8 +6,8 @@
 #include <boost/any.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include <MtcaMappedDevice/MappedDevice.h>
-#include <MtcaMappedDevice/PcieDevice.h>
+#include <MtcaMappedDevice/Device.h>
+#include <MtcaMappedDevice/PcieBackend.h>
 
 #include "ad16DummyDevice.h"
 #include "ad16Exception.h"
@@ -126,13 +126,13 @@ namespace mtca4u {
       boost::shared_ptr<RegisterInfoMap> _map;
 
       /// our mapped device
-      boost::shared_ptr< MappedDevice > _mappedDevice;
+      boost::shared_ptr<Device> _mappedDevice;
 
       /// pointer to dummy device (if used)
       boost::shared_ptr<ad16DummyDevice> _dummyDevice;
 
       /// pointer to real device (if used)
-      boost::shared_ptr<PcieDevice> _realDevice;
+      boost::shared_ptr<PcieBackend> _realDevice;
 
       /// accessor for multiplexed data
       boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > _dataDemuxed;
