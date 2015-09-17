@@ -37,8 +37,10 @@ class TestableDummyDevice : public ad16DummyDevice
 class DummyDeviceTest {
   public:
     DummyDeviceTest() {
+      std::list<std::string> params;
+      params.push_back(TEST_MAPPING_FILE);
       _dummyDevice = boost::shared_ptr<TestableDummyDevice>(
-          new TestableDummyDevice(".",TEST_MAPPING_FILE,std::list<std::string>()));
+          new TestableDummyDevice(".","virtual_ad16",params));
     }
 
     void testExceptions();
@@ -97,10 +99,10 @@ void DummyDeviceTest::testExceptions() {
   }
 
   // open twice
-  _dummyDevice->open(TEST_MAPPING_FILE);
-  BOOST_CHECK_THROW( _dummyDevice->open(TEST_MAPPING_FILE), DummyDeviceException);
+  _dummyDevice->open();
+  BOOST_CHECK_THROW( _dummyDevice->open(), DummyDeviceException);
   try {
-    _dummyDevice->open(TEST_MAPPING_FILE);
+    _dummyDevice->open();
   }
   catch(DummyDeviceException &a) {
     BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_OPEN);
@@ -110,7 +112,7 @@ void DummyDeviceTest::testExceptions() {
   _dummyDevice->close();
 
   // open it now, should not throw an exception
-  _dummyDevice->open(TEST_MAPPING_FILE);
+  _dummyDevice->open();
 
   // close again
   _dummyDevice->close();
@@ -184,7 +186,6 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
   int lengthOfaSequence = (*dataDemuxed)[0].size();
   BOOST_CHECK( lengthOfaSequence == 65536 );
 
-
   // check data:
   ERROR_FOUND = false;
   for(int iSample = 0; iSample < lengthOfaSequence; ++iSample) {
@@ -201,6 +202,7 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
 void DummyDeviceTest::testAutoTriggerMode() {
   std::cout << "testAutoTriggerMode" << std::endl;
   openDevice();
+  _dummyMapped.getRegisterAccessor("WORD_RESET_N","BOARD0")->write(0);        // reset
 
   // set test value of dummy device (to have something changing between the tests). Will be the content of the 3rd channel
   _dummyDevice->testValue = 2;
@@ -219,7 +221,7 @@ void DummyDeviceTest::testAutoTriggerMode() {
   // obtain current buffer
   int lastBuffer;
   _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
-  std::cout << "lastBuffer = " << lastBuffer << std::endl;
+  std::cout << "lastBuffer = " << lastBuffer << std::endl; std::cerr << std::flush;
 
   // enable DAQ
   _dummyMapped.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
@@ -254,12 +256,11 @@ void DummyDeviceTest::testAutoTriggerMode() {
   // described region should have at least one sequence.
   int lengthOfaSequence = (*dataDemuxed)[0].size();
 
-  lengthOfaSequence = 6;
-
   // check data:
   ERROR_FOUND = false;
   for(int iSample = 0; iSample < lengthOfaSequence; ++iSample) {
     if( ( (*dataDemuxed)[1][iSample] != iSample ) || ( (*dataDemuxed)[2][iSample] != 2 ) ) {
+      std::cout << std::flush;
       if(!ERROR_FOUND) std::cerr << "Wrong sample values for sample " << iSample << ": " << (*dataDemuxed)[1][iSample] << " " << (*dataDemuxed)[2][iSample] << std::endl;
       ERROR_FOUND = true;
     }

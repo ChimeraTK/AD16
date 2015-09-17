@@ -6,6 +6,7 @@
 #include <math.h>
 
 #include <mtca4uVirtualLab/VirtualDevice.h>
+#include <boost/random/uniform_int.hpp>
 #include <boost/random/mersenne_twister.hpp>
 
 namespace msm = boost::msm;
@@ -29,6 +30,14 @@ namespace mtca4u {
         strobe(this),
         trigger(this),
         timers(this),
+        regReset(this,"BOARD0","WORD_RESET_N"),
+        regTrigSel(this,"APP0","WORD_TIMING_TRG_SEL"),
+        regTrigFreq(this,"APP0","WORD_TIMING_FREQ"),
+        regSamplingFreqA(this,"AD160","WORD_ADC_A_TIMING_DIV"),
+        regBufferA(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA"),
+        regBufferB(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB"),
+        regCurBuffer(this,"APP0","WORD_DAQ_CURR_BUF"),
+        regBaseClockFreq(this,"AD160","WORD_CLK_FREQ"),
         theStateMachine(this),
         uniform(0, (1<<18) - 1),    // 18 bit random number
         currentBuffer(0),
@@ -40,41 +49,21 @@ namespace mtca4u {
       {
         theStateMachine.get_state< theDaq* >()->setDummyDevice(this);
         theStateMachine.start();
-      }
-
-      virtual ~ad16DummyDevice() {}
-
-
-      virtual void open() {
-        VirtualDevice::open();
-      }
-
-
-      /// on device open: fire the device-open event
-      virtual void open(const std::string &mappingFileName, int perm=O_RDWR, DeviceConfigBase *pConfig=NULL) {
-
-        // open the underlying dummy device
-        VirtualDevice::open(mappingFileName, perm, pConfig);
-
-        // send onDeviceOpen event
-        theStateMachine.process_event(onDeviceOpen());
-
-        // setup registers
-        regTrigSel.open(this,"APP0","WORD_TIMING_TRG_SEL");
-        regTrigFreq.open(this,"APP0","WORD_TIMING_FREQ");
-        regSamplingFreqA.open(this,"AD160","WORD_ADC_A_TIMING_DIV");
-        regBufferA.open(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA");
-        regBufferB.open(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB");
-        regCurBuffer.open(this,"APP0","WORD_DAQ_CURR_BUF");
-        regBaseClockFreq.open(this,"AD160","WORD_CLK_FREQ");
 
         // set default values (to match the fresh registers, they will be initialised with 0 on open)
         currentBuffer = 0;
         currentOffset = 0;
 
         // set clock frequency register
-        regBaseClockFreq.set(clockFrequency,0);
-        regBaseClockFreq.set(spiFrequency,1);
+        regBaseClockFreq[0] = clockFrequency;
+        regBaseClockFreq[1] = spiFrequency;
+      }
+
+      virtual ~ad16DummyDevice() {}
+
+      virtual void open() {
+        VirtualDevice::open();
+        theStateMachine.process_event(onDeviceOpen());
       }
 
       /// on device close: fire the device-close event
@@ -86,6 +75,7 @@ namespace mtca4u {
       /// events for device opening and closing
       DECLARE_EVENT(onDeviceOpen)
       DECLARE_EVENT(onDeviceClose)
+      DECLARE_EVENT(onDeviceReset)
 
       /// event fired on a trigger (-> swap buffers)
       DECLARE_EVENT(onTrigger)
@@ -105,6 +95,7 @@ namespace mtca4u {
       DECLARE_EVENT(onWriteTrigFreq)
 
       /// register accessors
+      DECLARE_REGISTER(int, regReset)             // BOARD0.WORD_RESET_N
       DECLARE_REGISTER(int, regTrigSel)           // APP0.WORD_TIMING_TRG_SEL
       DECLARE_REGISTER(int, regTrigFreq)          // APP0.WORD_TIMING_FREQ
       DECLARE_REGISTER(int, regSamplingFreqA)     // AD160.WORD_ADC_A_TIMING_DIV
@@ -115,6 +106,7 @@ namespace mtca4u {
 
       /// connect on-write events with register names
       WRITE_EVENT_TABLE(
+        CONNECT_REGISTER_EVENT(onDeviceReset, "BOARD0","WORD_RESET_N")
         CONNECT_REGISTER_EVENT(onWriteDaqEnable, "APP0","WORD_DAQ_ENABLE")
         CONNECT_REGISTER_EVENT(onWriteTrigSel, "APP0","WORD_TIMING_TRG_SEL")
         CONNECT_REGISTER_EVENT(onWriteUserTrigger, "APP0","WORD_TIMING_USER_TRG")
@@ -128,8 +120,8 @@ namespace mtca4u {
       DECLARE_REGISTER_GUARD( regIsTrue, value != 0 )            // for use with any boolean register
       DECLARE_REGISTER_GUARD( regIsFalse, value == 0 )           // for use with any boolean register
 
-      DECLARE_REGISTER_GUARD( userTriggerSelected, dev->regTrigSel.get() == 8 )
-      DECLARE_REGISTER_GUARD( internalTriggerSelected, dev->regTrigSel.get() == 0 )
+      DECLARE_REGISTER_GUARD( userTriggerSelected, dev->regTrigSel == 8 )
+      DECLARE_REGISTER_GUARD( internalTriggerSelected, dev->regTrigSel == 0 )
 
       /// states
       DECLARE_STATE(DevClosed)
@@ -142,14 +134,13 @@ namespace mtca4u {
 
       /// action: set the timer for the internal trigger
       DECLARE_ACTION(setTriggerTimer,
-        int trig = dev->regTrigSel.get();
-        int fdiv = dev->regTrigFreq.get(trig);
+        int fdiv = dev->regTrigFreq[dev->regTrigSel];
         dev->trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
       )
 
       /// action: set the strobe timer
       DECLARE_ACTION(setStrobeTimer,
-        int fdiv = dev->regSamplingFreqA.get();
+        int fdiv = dev->regSamplingFreqA;
         dev->strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
       )
 
@@ -199,6 +190,11 @@ namespace mtca4u {
         dev->triggerCounter++;
       )
 
+      DECLARE_ACTION(resetDevice,
+        dev->currentBuffer = 0;
+        dev->currentOffset = 0;
+      )
+
       /// define the state machine structure
       DECLARE_STATE_MACHINE(theDaq, DaqSetup() << TriggerSetup(), (
         // =======================================================================================================
@@ -243,6 +239,8 @@ namespace mtca4u {
         DevClosed() + onDeviceOpen() == DaqStopped(),
         DaqStopped() + onDeviceClose() == DevClosed(),
         theDaq() + onDeviceClose() == DevClosed(),
+        DaqStopped() + onDeviceReset() / resetDevice() == DaqStopped(),
+        theDaq() + onDeviceReset() / resetDevice() == DaqStopped(),
 
         // start and stop the DAQ
         DaqStopped() + onWriteDaqEnable() [ regIsTrue() ] == theDaq(),

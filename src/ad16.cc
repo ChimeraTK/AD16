@@ -48,8 +48,10 @@ namespace mtca4u {
     if(deviceFileName == mappingFileName){
 
       // create the dummy device driver
+      std::list<std::string> params;
+      params.push_back(mappingFileName);
       _dummyDevice = boost::shared_ptr<ad16DummyDevice>(
-          new ad16DummyDevice(".",mappingFileName,std::list<std::string>()) );
+          new ad16DummyDevice(".",mappingFileName,params) );
 
       // create mapped device
       _mappedDevice = boost::shared_ptr<Device>(new Device);
