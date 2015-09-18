@@ -40,7 +40,6 @@ namespace mtca4u {
         regBaseClockFreq(this,"AD160","WORD_CLK_FREQ"),
         theStateMachine(this),
         uniform(0, (1<<18) - 1),    // 18 bit random number
-        currentBuffer(0),
         currentOffset(0),
         clockFrequency(50000000),
         spiFrequency(25000000),
@@ -51,7 +50,7 @@ namespace mtca4u {
         theStateMachine.start();
 
         // set default values (to match the fresh registers, they will be initialised with 0 on open)
-        currentBuffer = 0;
+        regCurBuffer = 0;
         currentOffset = 0;
 
         // set clock frequency register
@@ -168,7 +167,7 @@ namespace mtca4u {
           }
           int ioffset = dev->currentOffset*numberOfChannels + ic;
           // write to the right buffer
-          if(dev->currentBuffer == 0) {
+          if(dev->regCurBuffer == 0) {
             dev->regBufferA[ioffset] = ival;
           }
           else {
@@ -182,8 +181,7 @@ namespace mtca4u {
       /// action: execute trigger
       DECLARE_ACTION(executeTrigger,
         // change current buffer
-        dev->currentBuffer = ( dev->currentBuffer == 0 ? 1 : 0 );
-        dev->regCurBuffer = dev->currentBuffer;
+        dev->regCurBuffer = ( dev->regCurBuffer == 0 ? 1 : 0 );
         // reset offset
         dev->currentOffset = 0;
         // increment trigger counter
@@ -191,7 +189,7 @@ namespace mtca4u {
       )
 
       DECLARE_ACTION(resetDevice,
-        dev->currentBuffer = 0;
+        dev->regCurBuffer = 0;
         dev->currentOffset = 0;
       )
 
@@ -257,9 +255,6 @@ namespace mtca4u {
       /// random number generator to fill channels with white noise
       boost::mt11213b rng;
       boost::uniform_int<> uniform;    // 18 bit random number
-
-      /// current buffer to write to
-      int32_t currentBuffer;
 
       /// current offset into the buffer (i.e. sample number)
       int32_t currentOffset;
