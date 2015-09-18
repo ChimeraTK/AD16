@@ -58,24 +58,6 @@ namespace mtca4u {
         regBaseClockFreq[1] = spiFrequency;
       }
 
-      virtual ~ad16DummyDevice() {}
-
-      virtual void open() {
-        VirtualDevice::open();
-        theStateMachine.process_event(onDeviceOpen());
-      }
-
-      /// on device close: fire the device-close event
-      virtual void close() {
-        VirtualDevice::close();
-        theStateMachine.process_event(onDeviceClose());
-      }
-
-      /// events for device opening and closing
-      DECLARE_EVENT(onDeviceOpen)
-      DECLARE_EVENT(onDeviceClose)
-      DECLARE_EVENT(onDeviceReset)
-
       /// event fired on a trigger (-> swap buffers)
       DECLARE_EVENT(onTrigger)
 
@@ -88,6 +70,7 @@ namespace mtca4u {
       DECLARE_TIMER_GROUP(timers, strobe, trigger)
 
       /// register read/write events
+      DECLARE_EVENT(onWriteReset)
       DECLARE_EVENT(onWriteDaqEnable)
       DECLARE_EVENT(onWriteUserTrigger)
       DECLARE_EVENT(onWriteTrigSel)
@@ -105,15 +88,12 @@ namespace mtca4u {
 
       /// connect on-write events with register names
       WRITE_EVENT_TABLE(
-        CONNECT_REGISTER_EVENT(onDeviceReset, "BOARD0","WORD_RESET_N")
+        CONNECT_REGISTER_EVENT(onWriteReset, "BOARD0","WORD_RESET_N")
         CONNECT_REGISTER_EVENT(onWriteDaqEnable, "APP0","WORD_DAQ_ENABLE")
         CONNECT_REGISTER_EVENT(onWriteTrigSel, "APP0","WORD_TIMING_TRG_SEL")
         CONNECT_REGISTER_EVENT(onWriteUserTrigger, "APP0","WORD_TIMING_USER_TRG")
         CONNECT_REGISTER_EVENT(onWriteTrigFreq, "APP0","WORD_TIMING_FREQ")
       )
-
-      /// connect on-read events with register names
-      READ_EVENT_TABLE()
 
       /// Guards for register values
       DECLARE_REGISTER_GUARD( regIsTrue, value != 0 )            // for use with any boolean register
@@ -123,7 +103,6 @@ namespace mtca4u {
       DECLARE_REGISTER_GUARD( internalTriggerSelected, dev->regTrigSel == 0 )
 
       /// states
-      DECLARE_STATE(DevClosed)
       DECLARE_STATE(DaqStopped)
       DECLARE_STATE(DaqSetup)
       DECLARE_STATE(DaqRunning)
@@ -220,34 +199,18 @@ namespace mtca4u {
         TriggerUser() + onWriteUserTrigger() / executeTrigger(),
 
         // internal trigger mode
-        TriggerInternal() + onTrigger() / ( setTriggerTimer(), executeTrigger() ),
-
-        // =======================================================================================================
-        // ignore some events in certain states (might occur after state change and should not throw an exception)
-        TriggerUser() + onWriteTrigFreq(),
-        TriggerInternal() + onWriteUserTrigger(),
-        TriggerUser() + onTrigger(),
-        DaqSetup() + onDeviceOpen()
+        TriggerInternal() + onTrigger() / ( setTriggerTimer(), executeTrigger() )
       ))
 
       /// define the state machine structure
-      DECLARE_STATE_MACHINE(mainStateMachine, DevClosed(), (
-        // =======================================================================================================
-        // open and close the device
-        DevClosed() + onDeviceOpen() == DaqStopped(),
-        DaqStopped() + onDeviceClose() == DevClosed(),
-        theDaq() + onDeviceClose() == DevClosed(),
-        DaqStopped() + onDeviceReset() / resetDevice() == DaqStopped(),
-        theDaq() + onDeviceReset() / resetDevice() == DaqStopped(),
+      DECLARE_STATE_MACHINE(mainStateMachine, DaqStopped(), (
+        // handle reset
+        DaqStopped() + onWriteReset() / resetDevice() == DaqStopped(),
+        theDaq() + onWriteReset() / resetDevice() == DaqStopped(),
 
         // start and stop the DAQ
         DaqStopped() + onWriteDaqEnable() [ regIsTrue() ] == theDaq(),
-        theDaq() + onWriteDaqEnable() [ regIsFalse() ] == DaqStopped(),
-
-        // =======================================================================================================
-        // ignore some events in certain states (might occur after state change and should not throw an exception)
-        DaqStopped() + onStrobe(),
-        DevClosed() + onStrobe()
+        theDaq() + onWriteDaqEnable() [ regIsFalse() ] == DaqStopped()
       ))
 
       mainStateMachine theStateMachine;
