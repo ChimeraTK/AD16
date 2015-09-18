@@ -21,12 +21,11 @@ namespace mtca4u {
    *  implements all registers defined in the mapping file in memory.
    *  Like this it mimics the real PCIe device.
    */
-  class ad16DummyDevice : public VirtualDevice<ad16DummyDevice>
+  class ad16DummyDevice : public VirtualLabBackend<ad16DummyDevice>
   {
     public:
 
-      ad16DummyDevice(std::string host, std::string instance, std::list< std::string > parameters) :
-        VirtualDevice(host,instance,parameters),
+      CONSTRUCTOR(ad16DummyDevice,
         strobe(this),
         trigger(this),
         timers(this),
@@ -38,16 +37,14 @@ namespace mtca4u {
         regBufferB(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB"),
         regCurBuffer(this,"APP0","WORD_DAQ_CURR_BUF"),
         regBaseClockFreq(this,"AD160","WORD_CLK_FREQ"),
-        theStateMachine(this),
         uniform(0, (1<<18) - 1),    // 18 bit random number
         currentOffset(0),
         clockFrequency(50000000),
         spiFrequency(25000000),
         testValue(999),
         triggerCounter(0)
-      {
-        theStateMachine.get_state< theDaq* >()->setDummyDevice(this);
-        theStateMachine.start();
+      )
+        INIT_SUB_STATE_MACHINE(theDaq)
 
         // set default values (to match the fresh registers, they will be initialised with 0 on open)
         regCurBuffer = 0;
@@ -56,7 +53,7 @@ namespace mtca4u {
         // set clock frequency register
         regBaseClockFreq[0] = clockFrequency;
         regBaseClockFreq[1] = spiFrequency;
-      }
+      END_CONSTRUCTOR
 
       /// event fired on a trigger (-> swap buffers)
       DECLARE_EVENT(onTrigger)
@@ -87,13 +84,13 @@ namespace mtca4u {
       DECLARE_REGISTER(int, regBaseClockFreq)     // AD160.WORD_CLK_FREQ
 
       /// connect on-write events with register names
-      WRITE_EVENT_TABLE(
+      WRITEEVENT_TABLE
         CONNECT_REGISTER_EVENT(onWriteReset, "BOARD0","WORD_RESET_N")
         CONNECT_REGISTER_EVENT(onWriteDaqEnable, "APP0","WORD_DAQ_ENABLE")
         CONNECT_REGISTER_EVENT(onWriteTrigSel, "APP0","WORD_TIMING_TRG_SEL")
         CONNECT_REGISTER_EVENT(onWriteUserTrigger, "APP0","WORD_TIMING_USER_TRG")
         CONNECT_REGISTER_EVENT(onWriteTrigFreq, "APP0","WORD_TIMING_FREQ")
-      )
+      END_WRITEEVENT_TABLE
 
       /// Guards for register values
       DECLARE_REGISTER_GUARD( regIsTrue, value != 0 )            // for use with any boolean register
@@ -111,19 +108,19 @@ namespace mtca4u {
       DECLARE_STATE(TriggerInternal)
 
       /// action: set the timer for the internal trigger
-      DECLARE_ACTION(setTriggerTimer,
+      DECLARE_ACTION(setTriggerTimer)
         int fdiv = dev->regTrigFreq[dev->regTrigSel];
         dev->trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
-      )
+      END_DECLARE_ACTION
 
       /// action: set the strobe timer
-      DECLARE_ACTION(setStrobeTimer,
+      DECLARE_ACTION(setStrobeTimer)
         int fdiv = dev->regSamplingFreqA;
         dev->strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
-      )
+        END_DECLARE_ACTION
 
       /// action: fill a single sample per channel into the buffer
-      DECLARE_ACTION(fillBuffer,
+      DECLARE_ACTION(fillBuffer)
         // do nothing if buffer is already full
         if(dev->currentOffset >= numberOfSamples) return;
         // fill the buffer
@@ -155,22 +152,22 @@ namespace mtca4u {
         }
         // increment the offset
         dev->currentOffset++;
-      )
+      END_DECLARE_ACTION
 
       /// action: execute trigger
-      DECLARE_ACTION(executeTrigger,
+      DECLARE_ACTION(executeTrigger)
         // change current buffer
         dev->regCurBuffer = ( dev->regCurBuffer == 0 ? 1 : 0 );
         // reset offset
         dev->currentOffset = 0;
         // increment trigger counter
         dev->triggerCounter++;
-      )
+      END_DECLARE_ACTION
 
-      DECLARE_ACTION(resetDevice,
+      DECLARE_ACTION(resetDevice)
         dev->regCurBuffer = 0;
         dev->currentOffset = 0;
-      )
+      END_DECLARE_ACTION
 
       /// define the state machine structure
       DECLARE_STATE_MACHINE(theDaq, DaqSetup() << TriggerSetup(), (
@@ -214,6 +211,7 @@ namespace mtca4u {
       ))
 
       mainStateMachine theStateMachine;
+      typedef boost::mpl::vector<theDaq> subStateMachines;
 
       /// random number generator to fill channels with white noise
       boost::mt11213b rng;
