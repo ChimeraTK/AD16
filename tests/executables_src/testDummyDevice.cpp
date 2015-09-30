@@ -6,41 +6,21 @@
 #include <boost/make_shared.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include <MtcaMappedDevice/Device.h>
+#include <mtca4u/Device.h>
 
-#include "ad16DummyDevice.h"
+#include "ad16dummy.h"
 
 using namespace boost::unit_test_framework;
 using namespace mtca4u;
 
-#define TEST_MAPPING_FILE "ad16_scope_fmc25_r1224.mapp"
+#define DUMMY_ALIAS "DUMMY"
 
 /**********************************************************************************************************************/
-// forward declaration so we can declare it friend
-// of TestableDummyDevice.
-class DummyDeviceTest;
-
-/**********************************************************************************************************************/
-/** The TestableDummyDevice is derived from 
- *  DummyDevice to get access to the protected members.
- *  This is done by declaring DummyDeviceTest as a friend.
- */
-class TestableDummyDevice : public ad16DummyDevice
-{
-    TestableDummyDevice(std::string host, std::string instance, std::list< std::string > parameters)
-    : ad16DummyDevice(host, instance, parameters)
-    {}
-    friend class DummyDeviceTest;
-};
-
-/**********************************************************************************************************************/
-class DummyDeviceTest {
+class DummyBackendTest {
   public:
-    DummyDeviceTest() {
-      std::list<std::string> params;
-      params.push_back(TEST_MAPPING_FILE);
-      _dummyDevice = boost::shared_ptr<TestableDummyDevice>(
-          new TestableDummyDevice(".","virtual_ad16",params));
+    DummyBackendTest() {
+      ad16dummy::backendRegisterer.dummy = 1;   // force linking the library...
+      _dummyBackend = boost::static_pointer_cast<ad16dummy>( BackendFactory::getInstance().createBackend(DUMMY_ALIAS) );
     }
 
     void testExceptions();
@@ -48,25 +28,21 @@ class DummyDeviceTest {
     void testAutoTriggerMode();
 
   private:
-    //TestableDummyDevice _dummyDevice;
-    boost::shared_ptr<TestableDummyDevice> _dummyDevice;
-    Device _dummyMapped;
-    ptrmapFile _registerMapping;
+    boost::shared_ptr<ad16dummy> _dummyBackend;
+    Device _dummy;
     void openDevice();
     friend class DummyDeviceTestSuite;
-
-
 };
 
 /**********************************************************************************************************************/
 class  DummyDeviceTestSuite : public test_suite {
   public:
     DummyDeviceTestSuite() : test_suite("DummyDevice test suite") {
-      boost::shared_ptr<DummyDeviceTest> dummyDeviceTest( new DummyDeviceTest );
+      boost::shared_ptr<DummyBackendTest> dummyDeviceTest( new DummyBackendTest );
 
-      add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testExceptions, dummyDeviceTest ) );
-      add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testSoftwareTriggeredMode, dummyDeviceTest ) );
-      add( BOOST_CLASS_TEST_CASE( &DummyDeviceTest::testAutoTriggerMode, dummyDeviceTest ) );
+      add( BOOST_CLASS_TEST_CASE( &DummyBackendTest::testExceptions, dummyDeviceTest ) );
+      add( BOOST_CLASS_TEST_CASE( &DummyBackendTest::testSoftwareTriggeredMode, dummyDeviceTest ) );
+      add( BOOST_CLASS_TEST_CASE( &DummyBackendTest::testAutoTriggerMode, dummyDeviceTest ) );
     }};
 
 /**********************************************************************************************************************/
@@ -79,101 +55,99 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/ [] )
 }
 
 /**********************************************************************************************************************/
-void DummyDeviceTest::openDevice() {
-  //_dummyDevice->open();
-  _registerMapping = mapFileParser().parse(TEST_MAPPING_FILE);
-  _dummyMapped.open( _dummyDevice, _registerMapping);
+void DummyBackendTest::openDevice() {
+  _dummy.open(DUMMY_ALIAS);
 }
 
 /**********************************************************************************************************************/
-void DummyDeviceTest::testExceptions() {
+void DummyBackendTest::testExceptions() {
   std::cout << "testExceptions" << std::endl;
 
   // close the not opened device
-  BOOST_CHECK_THROW( _dummyDevice->close(), DummyDeviceException);
+  BOOST_CHECK_THROW( _dummyBackend->close(), DummyBackendException);
   try {
-    _dummyDevice->close();
+    _dummyBackend->close();
   }
-  catch(DummyDeviceException &a) {
-    BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_CLOSED);
+  catch(DummyBackendException &a) {
+    BOOST_CHECK( a.getID() == DummyBackendException::ALREADY_CLOSED);
   }
 
   // open twice
-  _dummyDevice->open();
-  BOOST_CHECK_THROW( _dummyDevice->open(), DummyDeviceException);
+  _dummyBackend->open();
+  BOOST_CHECK_THROW( _dummyBackend->open(), DummyBackendException);
   try {
-    _dummyDevice->open();
+    _dummyBackend->open();
   }
-  catch(DummyDeviceException &a) {
-    BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_OPEN);
+  catch(DummyBackendException &a) {
+    BOOST_CHECK( a.getID() == DummyBackendException::ALREADY_OPEN);
   }
 
   // close again
-  _dummyDevice->close();
+  _dummyBackend->close();
 
   // open it now, should not throw an exception
-  _dummyDevice->open();
+  _dummyBackend->open();
 
   // close again
-  _dummyDevice->close();
+  _dummyBackend->close();
 
   // close the not opened device again
-  BOOST_CHECK_THROW( _dummyDevice->close(), DummyDeviceException);
+  BOOST_CHECK_THROW( _dummyBackend->close(), DummyBackendException);
   try {
-    _dummyDevice->close();
+    _dummyBackend->close();
   }
-  catch(DummyDeviceException &a) {
-    BOOST_CHECK( a.getID() == DummyDeviceException::ALREADY_CLOSED);
+  catch(DummyBackendException &a) {
+    BOOST_CHECK( a.getID() == DummyBackendException::ALREADY_CLOSED);
   }
 }
 
 /**********************************************************************************************************************/
-void DummyDeviceTest::testSoftwareTriggeredMode() {
+void DummyBackendTest::testSoftwareTriggeredMode() {
   std::cout << "testSoftwareTriggeredMode" << std::endl;
   openDevice();
 
   // set test value of dummy device (to have something changing between the tests). Will be the content of the 3rd channel
-  _dummyDevice->testValue = 1;
+  _dummyBackend->testValue = 1;
 
   // select ADCA ready as DAQ strobe
-  _dummyMapped.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
+  _dummy.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
 
   // enable software trigger
-  _dummyMapped.getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(8);
+  _dummy.getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(8);
 
   // set ADC sample rate
-  _dummyMapped.getRegisterAccessor("WORD_ADC_A_TIMING_DIV","AD160")->write(999);
-  _dummyMapped.getRegisterAccessor("WORD_ADC_B_TIMING_DIV","AD160")->write(999);
+  _dummy.getRegisterAccessor("WORD_ADC_A_TIMING_DIV","AD160")->write(999);
+  _dummy.getRegisterAccessor("WORD_ADC_B_TIMING_DIV","AD160")->write(999);
 
   // enable DAQ
-  _dummyMapped.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
+  _dummy.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
 
   // send user trigger
-  _dummyMapped.getRegisterAccessor("WORD_TIMING_USER_TRG","APP0")->write(1);
+  _dummy.getRegisterAccessor("WORD_TIMING_USER_TRG","APP0")->write(1);
 
   // advance dummy strobe timing until buffer is full
   bool ERROR_FOUND = false;
   for(int i=0; i<65536; i++) {
-    if( round(_dummyDevice->timers.getRemaining()*1000000.) != 20000 ) {
-      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timers.getRemaining()*1000000. << std::endl;
+    if( round(_dummyBackend->timers.getRemaining()*1000000.) != 20000 ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining()*1000000. << std::endl;
       ERROR_FOUND = true;
     }
-    _dummyDevice->timers.advance("strobe");
+    _dummyBackend->timers.advance("strobe");
   }
   BOOST_CHECK( !ERROR_FOUND );
 
   // obtain current buffer
   int currentBuffer;
-  _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+  _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
 
   // create accessor for multiplexed data
   boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
   std::cout << "currentBuffer = " << currentBuffer << std::endl;
   if(currentBuffer == 0) {
-    dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
+    dataDemuxed = _dummy.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
   }
   else {
-    dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCB", "APP0");
+    dataDemuxed = _dummy.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCB", "APP0");
   }
   dataDemuxed->read();
 
@@ -196,59 +170,60 @@ void DummyDeviceTest::testSoftwareTriggeredMode() {
   }
   BOOST_CHECK( !ERROR_FOUND );
 
-  _dummyMapped.close();
+  _dummy.close();
 }
+
 /**********************************************************************************************************************/
-void DummyDeviceTest::testAutoTriggerMode() {
+void DummyBackendTest::testAutoTriggerMode() {
   std::cout << "testAutoTriggerMode" << std::endl;
   openDevice();
-  _dummyMapped.getRegisterAccessor("WORD_RESET_N","BOARD0")->write(0);        // reset
+  _dummy.getRegisterAccessor("WORD_RESET_N","BOARD0")->write(0);        // reset
 
   // set test value of dummy device (to have something changing between the tests). Will be the content of the 3rd channel
-  _dummyDevice->testValue = 2;
+  _dummyBackend->testValue = 2;
 
   // select ADCA ready as DAQ strobe
-  _dummyMapped.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
+  _dummy.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
 
   // enable trigger 0 and set it to 1 Hz
-  _dummyMapped.getRegisterAccessor("WORD_TIMING_FREQ","APP0")->write(49999999);
-  _dummyMapped.getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(0);
+  _dummy.getRegisterAccessor("WORD_TIMING_FREQ","APP0")->write(49999999);
+  _dummy.getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0")->write(0);
 
   // set ADC sample rate
-  _dummyMapped.getRegisterAccessor("WORD_ADC_A_TIMING_DIV","AD160")->write(499);
-  _dummyMapped.getRegisterAccessor("WORD_ADC_B_TIMING_DIV","AD160")->write(499);
+  _dummy.getRegisterAccessor("WORD_ADC_A_TIMING_DIV","AD160")->write(499);
+  _dummy.getRegisterAccessor("WORD_ADC_B_TIMING_DIV","AD160")->write(499);
 
   // obtain current buffer
   int lastBuffer;
-  _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
+  _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
   std::cout << "lastBuffer = " << lastBuffer << std::endl; std::cerr << std::flush;
 
   // enable DAQ
-  _dummyMapped.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
+  _dummy.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
 
   // check trigger timing
-  BOOST_CHECK( round(_dummyDevice->trigger.getRemaining()*1000000.) == 1000000000. );
+  BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
 
   // wait until conversion is complete
   int currentBuffer;
   bool ERROR_FOUND = false;
   do {
-    _dummyMapped.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
-    if( round(_dummyDevice->timers.getRemaining()*1000000.) != 10000 ) {
-      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyDevice->timers.getRemaining()*1000000. << std::endl;
+    _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+    if( round(_dummyBackend->timers.getRemaining()*1000000.) != 10000 ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining()*1000000. << std::endl;
       ERROR_FOUND = true;
     }
-    _dummyDevice->timers.advance("strobe");
+    _dummyBackend->timers.advance("strobe");
   } while(currentBuffer == lastBuffer);
   BOOST_CHECK( !ERROR_FOUND );
 
   // create accessor for multiplexed data
   boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
   if(currentBuffer == 1) {
-    dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
+    dataDemuxed = _dummy.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCA", "APP0");
   }
   else {
-    dataDemuxed = _dummyMapped.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCB", "APP0");
+    dataDemuxed = _dummy.getCustomAccessor< mtca4u::MultiplexedDataAccessor<int32_t> >("DAQ0_ADCB", "APP0");
   }
   dataDemuxed->read();
 
@@ -267,5 +242,11 @@ void DummyDeviceTest::testAutoTriggerMode() {
   }
   BOOST_CHECK( !ERROR_FOUND );
 
-  _dummyMapped.close();
+  // wait until another conversion is complete (this time via the trigger timer)
+  _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
+  _dummyBackend->timers.advance("trigger");
+  _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+  BOOST_CHECK( lastBuffer != currentBuffer );
+
+  _dummy.close();
 }

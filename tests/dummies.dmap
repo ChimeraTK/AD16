@@ -1,0 +1,3 @@
+DUMMY sdm://./ad16dummy:0=ad16_scope_fmc25_r1224.mapp ad16_scope_fmc25_r1224.mapp
+WRONG_DUMMY sdm://./pci:mtcadummys0; ad16_scope_fmc25_r1224.mapp
+AD16_on_mskcpuref1 sdm://./pci:llrfutcs5; ad16_scope_fmc25_r1224.mapp

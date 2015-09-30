@@ -5,7 +5,7 @@
 #include <float.h>
 #include <math.h>
 
-#include <mtca4uVirtualLab/VirtualDevice.h>
+#include <mtca4uVirtualLab/VirtualLabBackend.h>
 #include <boost/random/uniform_int.hpp>
 #include <boost/random/mersenne_twister.hpp>
 
@@ -21,28 +21,29 @@ namespace mtca4u {
    *  implements all registers defined in the mapping file in memory.
    *  Like this it mimics the real PCIe device.
    */
-  class ad16DummyDevice : public VirtualLabBackend<ad16DummyDevice>
+  class ad16dummy : public VirtualLabBackend<ad16dummy>
   {
     public:
 
-      CONSTRUCTOR(ad16DummyDevice,
-        strobe(this),
-        trigger(this),
-        timers(this),
-        regReset(this,"BOARD0","WORD_RESET_N"),
-        regTrigSel(this,"APP0","WORD_TIMING_TRG_SEL"),
-        regTrigFreq(this,"APP0","WORD_TIMING_FREQ"),
-        regSamplingFreqA(this,"AD160","WORD_ADC_A_TIMING_DIV"),
-        regBufferA(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA"),
-        regBufferB(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB"),
-        regCurBuffer(this,"APP0","WORD_DAQ_CURR_BUF"),
-        regBaseClockFreq(this,"AD160","WORD_CLK_FREQ"),
-        uniform(0, (1<<18) - 1),    // 18 bit random number
-        currentOffset(0),
-        clockFrequency(50000000),
-        spiFrequency(25000000),
-        testValue(999),
-        triggerCounter(0)
+      CONSTRUCTOR(ad16dummy,
+          uniform(0, (1<<18) - 1),    // 18 bit random number
+          currentOffset(0),
+          clockFrequency(50000000),
+          spiFrequency(25000000),
+          testValue(999),
+          triggerCounter(0),
+          strobe(this),
+          trigger(this),
+          timers(this),
+          regReset(this,"BOARD0","WORD_RESET_N"),
+          regTrigSel(this,"APP0","WORD_TIMING_TRG_SEL"),
+          regTrigFreq(this,"APP0","WORD_TIMING_FREQ"),
+          regTrigIntEna(this, "APP0","WORD_TIMING_INT_ENA"),
+          regSamplingFreqA(this,"AD160","WORD_ADC_A_TIMING_DIV"),
+          regBufferA(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA"),
+          regBufferB(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB"),
+          regCurBuffer(this,"APP0","WORD_DAQ_CURR_BUF"),
+          regBaseClockFreq(this,"AD160","WORD_CLK_FREQ")
       )
         INIT_SUB_STATE_MACHINE(theDaq)
 
@@ -54,6 +55,36 @@ namespace mtca4u {
         regBaseClockFreq[0] = clockFrequency;
         regBaseClockFreq[1] = spiFrequency;
       END_CONSTRUCTOR
+
+      /// random number generator to fill channels with white noise
+      boost::mt11213b rng;
+      boost::uniform_int<> uniform;    // 18 bit random number
+
+      /// current offset into the buffer (i.e. sample number)
+      int32_t currentOffset;
+
+      /// number of channels. Must be a factor of 2 (since we have 2 chips) and is essentially fixed at 16. Don't expect
+      /// things to work out-of-the-box if this number is changed.
+      const static int32_t numberOfChannels = 16;
+
+      /// number of samples per buffer and channel
+      const static int32_t numberOfSamples = 65536;
+
+      /// ADC clock frequency in Hz (-> WORD_CLK_FREQ[0])
+      /// Defaults to 50 MHz but can be changed by the tests to make sure the library works with any frequency. It must
+      /// be changed before the call to openDev() happens to be written to the register correctly!
+      int32_t clockFrequency;
+
+      /// SPI clock frequency in Hz (-> WORD_CLK_FREQ[1])
+      /// Defaults to 50 MHz but can be changed by the tests to make sure the library works with any frequency. It must
+      /// be changed before the call to openDev() happens to be written to the register correctly!
+      int32_t spiFrequency;
+
+      /// some test value to be written to the 3rd channel
+      int32_t testValue;
+
+      /// trigger counter, will be written into the 4th channel
+      int32_t triggerCounter;
 
       /// event fired on a trigger (-> swap buffers)
       DECLARE_EVENT(onTrigger)
@@ -77,6 +108,7 @@ namespace mtca4u {
       DECLARE_REGISTER(int, regReset)             // BOARD0.WORD_RESET_N
       DECLARE_REGISTER(int, regTrigSel)           // APP0.WORD_TIMING_TRG_SEL
       DECLARE_REGISTER(int, regTrigFreq)          // APP0.WORD_TIMING_FREQ
+      DECLARE_REGISTER(int, regTrigIntEna)        // APP0.WORD_TIMING_INT_ENA -> only used in testLibrary
       DECLARE_REGISTER(int, regSamplingFreqA)     // AD160.WORD_ADC_A_TIMING_DIV
       DECLARE_REGISTER(int, regBufferA)           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA
       DECLARE_REGISTER(int, regBufferB)           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB
@@ -167,6 +199,8 @@ namespace mtca4u {
       DECLARE_ACTION(resetDevice)
         dev->regCurBuffer = 0;
         dev->currentOffset = 0;
+        dev->strobe.clear();
+        dev->trigger.clear();
       END_DECLARE_ACTION
 
       /// define the state machine structure
@@ -200,7 +234,7 @@ namespace mtca4u {
       ))
 
       /// define the state machine structure
-      DECLARE_STATE_MACHINE(mainStateMachine, DaqStopped(), (
+      DECLARE_MAIN_STATE_MACHINE(DaqStopped(), (
         // handle reset
         DaqStopped() + onWriteReset() / resetDevice() == DaqStopped(),
         theDaq() + onWriteReset() / resetDevice() == DaqStopped(),
@@ -210,40 +244,8 @@ namespace mtca4u {
         theDaq() + onWriteDaqEnable() [ regIsFalse() ] == DaqStopped()
       ))
 
-      mainStateMachine theStateMachine;
-      typedef boost::mpl::vector<theDaq> subStateMachines;
-
-      /// random number generator to fill channels with white noise
-      boost::mt11213b rng;
-      boost::uniform_int<> uniform;    // 18 bit random number
-
-      /// current offset into the buffer (i.e. sample number)
-      int32_t currentOffset;
-
-      /// number of channels. Must be a factor of 2 (since we have 2 chips) and is essentially fixed at 16. Don't expect
-      /// things to work out-of-the-box if this number is changed.
-      const static int32_t numberOfChannels = 16;
-
-      /// number of samples per buffer and channel
-      const static int32_t numberOfSamples = 65536;
-
-      /// ADC clock frequency in Hz (-> WORD_CLK_FREQ[0])
-      /// Defaults to 50 MHz but can be changed by the tests to make sure the library works with any frequency. It must
-      /// be changed before the call to openDev() happens to be written to the register correctly!
-      int32_t clockFrequency;
-
-      /// SPI clock frequency in Hz (-> WORD_CLK_FREQ[1])
-      /// Defaults to 50 MHz but can be changed by the tests to make sure the library works with any frequency. It must
-      /// be changed before the call to openDev() happens to be written to the register correctly!
-      int32_t spiFrequency;
-
-      /// some test value to be written to the 3rd channel
-      int32_t testValue;
-
-      /// trigger counter, will be written into the 4th channel
-      int32_t triggerCounter;
-
   };
+
 
 }//namespace mtca4u
 

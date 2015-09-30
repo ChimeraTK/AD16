@@ -6,10 +6,10 @@
 #include <boost/any.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
-#include <MtcaMappedDevice/Device.h>
-#include <MtcaMappedDevice/PcieBackend.h>
+#include <mtca4u/Device.h>
+#include <mtca4u/BufferingRegisterAccessor.h>
+#include <mtca4u/PcieBackend.h>
 
-#include "ad16DummyDevice.h"
 #include "ad16Exception.h"
 
 #ifdef ENABLE_PYTHON_BINDINGS
@@ -27,14 +27,8 @@ namespace mtca4u {
       ad16() : _isOpen(false), _mode(0), _currentBuffer(-1), _samplingFrequency(-1) {};
       ~ad16() {};
 
-      /// Open AD16 device through a DMAP file
-      /// deviceAlias is the alias name of the AD16 to open inside the dmap file.
-      void openDmap(const std::string &dmapFileName, const std::string &deviceAlias);
-
-      /// Open AD16 device by specifying the device and mapping file names
-      /// If the deviceFileName and the mappingFileName both contain the mappingFileName, a dummy device based on that
-      /// mapping file will be created.
-      void open(const std::string &deviceFileName, const std::string &mappingFileName);
+      /// Open AD16 device through its alias name (as specified in the dmap file)
+      void open(const std::string &deviceAlias);
 
       /// Close AD16 device.
       void close();
@@ -122,17 +116,24 @@ namespace mtca4u {
       /// flag if already opened
       bool _isOpen;
 
-      /// register map
-      boost::shared_ptr<RegisterInfoMap> _map;
-
       /// our mapped device
-      boost::shared_ptr<Device> _mappedDevice;
+      boost::shared_ptr<Device> _device;
 
-      /// pointer to dummy device (if used)
-      boost::shared_ptr<ad16DummyDevice> _dummyDevice;
-
-      /// pointer to real device (if used)
-      boost::shared_ptr<PcieBackend> _realDevice;
+      /// control register accessors
+      BufferingRegisterAccessor<int> regReset;
+      BufferingRegisterAccessor<int> regAd16Enable;
+      BufferingRegisterAccessor<int> regClockFrequency;  // [0] is the main clock, [1] is the SPI clock frequency in Hz
+      BufferingRegisterAccessor<int> regTimingFrequency;
+      BufferingRegisterAccessor<int> regTimingInternalEnable;
+      BufferingRegisterAccessor<int> regTimingTriggerSelect;
+      BufferingRegisterAccessor<int> regTimingUserTrigger;
+      BufferingRegisterAccessor<int> regDaqEnable;
+      BufferingRegisterAccessor<int> regStrobeSelect;
+      BufferingRegisterAccessor<int> regCurrentBuffer;
+      BufferingRegisterAccessor<int> regReadModeA, regReadModeB;
+      BufferingRegisterAccessor<int> regTimingDivA, regTimingDivB;
+      BufferingRegisterAccessor<int> regOversamplingA, regOversamplingB;
+      BufferingRegisterAccessor<int> regVoltageRangeA, regVoltageRangeB;
 
       /// accessor for multiplexed data
       boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > _dataDemuxed;
@@ -157,10 +158,6 @@ namespace mtca4u {
 
       /// start time of last conversion
       boost::posix_time::ptime t0;
-
-      /// AD16 application clock frequency WORD_CLK_FREQ[]
-      ///  [0] is the main clock, [1] is the SPI clock frequency in Hz
-      int clock_frequency[2];
 
       /// Table of conversion times, needed to select the right read mode. The conversion time depends on the selected
       /// oversampling ratio, the index of this table it the value of the enum oversamplingRatio. The times are in

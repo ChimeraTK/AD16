@@ -1,7 +1,7 @@
 #ifndef MTCA4U_AD16_EXCEPTION_H
 #define MTCA4U_AD16_EXCEPTION_H
 
-#include <MtcaMappedDevice/Exception.h>
+#include <mtca4u/Exception.h>
 
 namespace mtca4u
 {

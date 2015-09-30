@@ -1,31 +1,24 @@
 #include <boost/test/included/unit_test.hpp>
 using namespace boost::unit_test_framework;
+
 #include <boost/lambda/lambda.hpp>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 
 #include "ad16.h"
+#include "ad16dummy.h"
+
 using namespace mtca4u;
 
-#define TEST_MAPPING_FILE "ad16_scope_fmc25_r1224.mapp"
-
-// forward declaration so we can declare it friend
-// of TestableDummyDevice.
-class Ad16Test;
-
-/**********************************************************************************************************************/
-/** The TestableAd16 is derived from ad16 DummyDevice to get access to the protected members.
- *  This is done by declaring DummyLibTest as a friend.
- */
-class TestableAd16 : public ad16 {
-    friend class Ad16Test;
-};
+#define DUMMY_ALIAS "DUMMY"
+#define DUMMY_ALIAS_WRONG "WRONG_DUMMY"
 
 /**********************************************************************************************************************/
 class Ad16Test {
   public:
     Ad16Test() {
+      backend = boost::static_pointer_cast<ad16dummy>(BackendFactory::getInstance().createBackend(DUMMY_ALIAS));
     }
 
     void testExceptions();
@@ -34,25 +27,27 @@ class Ad16Test {
     void testPeriodicTriggeredMode();
 
   private:
-    TestableAd16 ad;
+    ad16 ad;
+    boost::shared_ptr<ad16dummy> backend;
     friend class Ad16TestSuite;
 
 };
 
 /**********************************************************************************************************************/
-class Ad16TestSuite : public test_suite {
+class Ad16TestSuite: public test_suite {
   public:
-    Ad16TestSuite() : test_suite("DummyDevice test suite"){
-      boost::shared_ptr<Ad16Test> ad16Test( new Ad16Test );
-      add( BOOST_CLASS_TEST_CASE( &Ad16Test::testExceptions, ad16Test ) );
-      add( BOOST_CLASS_TEST_CASE( &Ad16Test::testTriggerModes, ad16Test ) );
-      add( BOOST_CLASS_TEST_CASE( &Ad16Test::testSoftwareTriggeredMode, ad16Test ) );
-      add( BOOST_CLASS_TEST_CASE( &Ad16Test::testPeriodicTriggeredMode, ad16Test ) );
+    Ad16TestSuite()
+        : test_suite("DummyDevice test suite") {
+      boost::shared_ptr<Ad16Test> ad16Test(new Ad16Test);
+      add(BOOST_CLASS_TEST_CASE(&Ad16Test::testExceptions, ad16Test));
+      add(BOOST_CLASS_TEST_CASE(&Ad16Test::testTriggerModes, ad16Test));
+      add(BOOST_CLASS_TEST_CASE(&Ad16Test::testSoftwareTriggeredMode, ad16Test));
+      add(BOOST_CLASS_TEST_CASE(&Ad16Test::testPeriodicTriggeredMode, ad16Test));
     }
 };
 
 /**********************************************************************************************************************/
-test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/ [] ) {
+test_suite* init_unit_test_suite(int /*argc*/, char* /*argv*/[]) {
   framework::master_test_suite().p_name.value = "AD16 DummyDevice test suite";
   framework::master_test_suite().add(new Ad16TestSuite);
 
@@ -65,114 +60,105 @@ void Ad16Test::testExceptions() {
 
   // tests before opening the device: should all throw exceptions
   // close device
-  BOOST_CHECK_THROW( ad.close() , ad16Exception);
+  BOOST_CHECK_THROW(ad.close(), ad16Exception);
   try {
     ad.close();
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::NOT_OPENED);
+    BOOST_CHECK(a.getID() == ad16Exception::NOT_OPENED);
   }
 
   // send user trigger
-  BOOST_CHECK_THROW( ad.sendUserTrigger() , ad16Exception);
+  BOOST_CHECK_THROW(ad.sendUserTrigger(), ad16Exception);
   try {
     ad.sendUserTrigger();
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::NOT_OPENED);
-  }
-
-  // open non-existing dmap file
-  BOOST_CHECK_THROW( ad.openDmap("this_file_does_not_exist","AD16") , ad16Exception);
-  try {
-    ad.openDmap("this_file_does_not_exist","AD16");
-  }
-  catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::CANNOT_OPEN);
+    BOOST_CHECK(a.getID() == ad16Exception::NOT_OPENED);
   }
 
   // open dummy-PCIe device (wrong type of PCIe device)
-  BOOST_CHECK_THROW( ad.open("mtcadummys0",TEST_MAPPING_FILE) , ad16Exception);
+  BOOST_CHECK_THROW(ad.open(DUMMY_ALIAS_WRONG), ad16Exception);
   ad.close();
   try {
-    ad.open("mtcadummys0",TEST_MAPPING_FILE);
+    ad.open(DUMMY_ALIAS_WRONG);
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::CANNOT_OPEN);
+    BOOST_CHECK(a.getID() == ad16Exception::CANNOT_OPEN);
   }
   ad.close();
 
   // open device
-  ad.openDmap("ad16.dmap","DUMMY");
+  ad.open(DUMMY_ALIAS);
 
   // open a second time: should throw exception
-  BOOST_CHECK_THROW( ad.open(TEST_MAPPING_FILE,TEST_MAPPING_FILE) , ad16Exception);
+  BOOST_CHECK_THROW(ad.open(DUMMY_ALIAS), ad16Exception);
   try {
-    ad.open(TEST_MAPPING_FILE,TEST_MAPPING_FILE);
+    ad.open(DUMMY_ALIAS);
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::ALREADY_OPENED);
+    BOOST_CHECK(a.getID() == ad16Exception::ALREADY_OPENED);
   }
 
   // set illegal sampling rate
-  BOOST_CHECK_THROW( ad.setSamplingRate(100000.1) , ad16Exception);
+  BOOST_CHECK_THROW(ad.setSamplingRate(100000.1), ad16Exception);
   try {
     ad.setSamplingRate(100000.1);
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::IMPOSSIBLE_TIMING_CONFIGURATION);
+    BOOST_CHECK(a.getID() == ad16Exception::IMPOSSIBLE_TIMING_CONFIGURATION);
   }
 
   // set illegal combination of sampling rate and oversampling ratio
-  BOOST_CHECK_THROW( ad.setSamplingRate(100000., ad16::RATIO_4) , ad16Exception);
+  BOOST_CHECK_THROW(ad.setSamplingRate(100000., ad16::RATIO_4), ad16Exception);
   try {
     ad.setSamplingRate(100000., ad16::RATIO_4);
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::IMPOSSIBLE_TIMING_CONFIGURATION);
+    BOOST_CHECK(a.getID() == ad16Exception::IMPOSSIBLE_TIMING_CONFIGURATION);
   }
 
   // trigger-type argument for PERIODIC missing
-  BOOST_CHECK_THROW( ad.setTriggerMode(ad16::PERIODIC) , ad16Exception);
+  BOOST_CHECK_THROW(ad.setTriggerMode(ad16::PERIODIC), ad16Exception);
   try {
     ad.setTriggerMode(ad16::PERIODIC);
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::ILLEGAL_PARAMETER);
+    BOOST_CHECK(a.getID() == ad16Exception::ILLEGAL_PARAMETER);
   }
 
   // trigger-type argument for EXTERNAL of wrong type
-  BOOST_CHECK_THROW( ad.setTriggerMode(ad16::EXTERNAL,std::string("test")) , ad16Exception);
+  BOOST_CHECK_THROW(ad.setTriggerMode(ad16::EXTERNAL, std::string("test")), ad16Exception);
   try {
-    ad.setTriggerMode(ad16::EXTERNAL,std::string("test"));
+    ad.setTriggerMode(ad16::EXTERNAL, std::string("test"));
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::ILLEGAL_PARAMETER);
+    BOOST_CHECK(a.getID() == ad16Exception::ILLEGAL_PARAMETER);
   }
 
   // trigger-type argument for EXTERNAL out of range
-  BOOST_CHECK_THROW( ad.setTriggerMode(ad16::EXTERNAL,-1) , ad16Exception);
+  BOOST_CHECK_THROW(ad.setTriggerMode(ad16::EXTERNAL, -1), ad16Exception);
   try {
-    ad.setTriggerMode(ad16::EXTERNAL,-1);
+    ad.setTriggerMode(ad16::EXTERNAL, -1);
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::INCORRECT_TRIGGER_SETTING);
+    BOOST_CHECK(a.getID() == ad16Exception::INCORRECT_TRIGGER_SETTING);
   }
 
   // timeout when sending a user trigger without enabled DAQ
-  BOOST_CHECK_THROW( ad.sendUserTrigger() , ad16Exception);
+  BOOST_CHECK_THROW(ad.sendUserTrigger(), ad16Exception);
   try {
     ad.sendUserTrigger();
   }
   catch(ad16Exception &a) {
-    BOOST_CHECK( a.getID() == ad16Exception::TIMEOUT);
+    BOOST_CHECK(a.getID() == ad16Exception::TIMEOUT);
   }
 
   // read data (otherwise getChannelData() does not work)
   ad.read();
 
   // get channel out of range: should throw exception
-  BOOST_CHECK_THROW( ad.getChannelData(16) , ad16Exception);
+  BOOST_CHECK_THROW(ad.getChannelData(16), ad16Exception);
   try {
     ad.getChannelData(16);
   }
@@ -189,50 +175,31 @@ void Ad16Test::testExceptions() {
 void Ad16Test::testTriggerModes() {
   std::cout << "testTriggerModes" << std::endl;
   RegisterInfoMap::RegisterInfo elem;
-  int32_t val;
 
   // open device
-  ad.open(TEST_MAPPING_FILE,TEST_MAPPING_FILE);
+  ad.open(DUMMY_ALIAS);
 
   // test periodic trigger mode
-  ad.setTriggerMode(ad16::PERIODIC,1.);
-  ad._map->getRegisterInfo("WORD_TIMING_TRG_SEL", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( val == 0 );
-  ad._map->getRegisterInfo("WORD_TIMING_INT_ENA", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( (val & (1<<0)) != 0 );
-  ad._map->getRegisterInfo("WORD_TIMING_FREQ", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( val == 49999999 );               // 1 Hz
+  ad.setTriggerMode(ad16::PERIODIC, 1.);
+  BOOST_CHECK(backend->regTrigSel == 0);
+  BOOST_CHECK((backend->regTrigIntEna & (1 << 0)) != 0);
+  BOOST_CHECK(backend->regTrigFreq == 49999999);               // 1 Hz
 
   // test user trigger mode
   ad.setTriggerMode(ad16::USER);
-  ad._map->getRegisterInfo("WORD_TIMING_TRG_SEL", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( val == 8 );
-  ad._map->getRegisterInfo("WORD_TIMING_INT_ENA", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( (val & (1<<8)) == 0 );
+  BOOST_CHECK(backend->regTrigSel == 8);
+  BOOST_CHECK((backend->regTrigIntEna & (1 << 8)) == 0);
 
   // test external trigger mode on channel 3
-  ad.setTriggerMode(ad16::EXTERNAL,3);
-  ad._map->getRegisterInfo("WORD_TIMING_TRG_SEL", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( val == 3 );
-  ad._map->getRegisterInfo("WORD_TIMING_INT_ENA", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( (val & (1<<3)) == 0 );
+  ad.setTriggerMode(ad16::EXTERNAL, 3);
+  BOOST_CHECK(backend->regTrigSel == 3);
+  BOOST_CHECK((backend->regTrigIntEna & (1 << 3)) == 0);
 
   // test external trigger mode on channel 0 after the PERIODIC trigger was enabled (they are on the same channel)
-  ad.setTriggerMode(ad16::PERIODIC,1.);
-  ad.setTriggerMode(ad16::EXTERNAL,0);
-  ad._map->getRegisterInfo("WORD_TIMING_TRG_SEL", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( val == 0 );
-  ad._map->getRegisterInfo("WORD_TIMING_INT_ENA", elem, "APP0");
-  ad._dummyDevice->read(elem.reg_bar,elem.reg_address,&val,4);
-  BOOST_CHECK( (val & (1<<0)) == 0 );
+  ad.setTriggerMode(ad16::PERIODIC, 1.);
+  ad.setTriggerMode(ad16::EXTERNAL, 0);
+  BOOST_CHECK(backend->regTrigSel == 0);
+  BOOST_CHECK((backend->regTrigIntEna & (1 << 0)) == 0);
 
   // close device
   ad.close();
@@ -244,7 +211,7 @@ void Ad16Test::testSoftwareTriggeredMode() {
   std::cout << "testSoftwareTriggeredMode" << std::endl;
 
   // open device
-  ad.open(TEST_MAPPING_FILE,TEST_MAPPING_FILE);
+  ad.open(DUMMY_ALIAS);
 
   // setup software trigger
   ad.setTriggerMode(ad16::USER);
@@ -253,7 +220,7 @@ void Ad16Test::testSoftwareTriggeredMode() {
   ad.enableDaq();
 
   // wait until conversion is complete
-  for(int i=0; i<65536; i++) ad._dummyDevice->timers.advance();
+  for(int i = 0; i < 65536; i++) backend->timers.advance("strobe");
 
   // send another trigger to swap the buffers
   ad.sendUserTrigger();
@@ -264,10 +231,10 @@ void Ad16Test::testSoftwareTriggeredMode() {
   // compare first channel data
   std::vector<int> data = ad.getChannelData(1);
   bool FOUND_ERROR = false;
-  for (uint columnCount = 0; columnCount < data.size(); ++columnCount) {
-    if( data[columnCount] != (int)columnCount ) FOUND_ERROR = true;
+  for(uint columnCount = 0; columnCount < data.size(); ++columnCount) {
+    if(data[columnCount] != (int) columnCount) FOUND_ERROR = true;
   }
-  BOOST_CHECK( !FOUND_ERROR );
+  BOOST_CHECK(!FOUND_ERROR);
 
   // close device
   ad.close();
@@ -279,16 +246,18 @@ void Ad16Test::testPeriodicTriggeredMode() {
   std::cout << "testPeriodicTriggeredMode" << std::endl;
 
   // open device
-  ad.open(TEST_MAPPING_FILE,TEST_MAPPING_FILE);
+  ad.open(DUMMY_ALIAS);
 
   // setup software trigger
-  ad.setTriggerMode(ad16::PERIODIC,1.);    // 1 Hz
+  ad.setTriggerMode(ad16::PERIODIC, 1.);    // 1 Hz
 
   // enable the DAQ
   ad.enableDaq();
 
   // wait until conversion is complete
-  while(!ad.conversionComplete()) ad._dummyDevice->timers.advance();
+  BOOST_CHECK( ad.conversionComplete() == false );
+  backend->timers.advance("trigger");
+  BOOST_CHECK( ad.conversionComplete() == true );
 
   // read data
   ad.read();
@@ -296,10 +265,10 @@ void Ad16Test::testPeriodicTriggeredMode() {
   // compare first channel data
   std::vector<int> data = ad.getChannelData(1);
   bool FOUND_ERROR = false;
-  for (uint columnCount = 0; columnCount < data.size(); ++columnCount) {
-    if( data[columnCount] != (int)columnCount ) FOUND_ERROR = true;
+  for(uint columnCount = 0; columnCount < data.size(); ++columnCount) {
+    if(data[columnCount] != (int) columnCount) FOUND_ERROR = true;
   }
-  BOOST_CHECK( !FOUND_ERROR );
+  BOOST_CHECK(!FOUND_ERROR);
 
   // close device
   ad.close();

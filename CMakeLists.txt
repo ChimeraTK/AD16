@@ -19,8 +19,8 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 --coverage")
 # linker flags
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--export-dynamic")
 
-FIND_PACKAGE(MtcaMappedDevice 00.17 REQUIRED)
-include_directories(SYSTEM ${MtcaMappedDevice_INCLUDE_DIRS})
+FIND_PACKAGE(mtca4u-deviceaccess 00.00 REQUIRED)
+include_directories(SYSTEM ${mtca4u-deviceaccess_INCLUDE_DIRS})
 
 FIND_PACKAGE(mtca4uVirtualLab 00.01 REQUIRED)
 include_directories(SYSTEM ${mtca4uVirtualLab_INCLUDE_DIRS})
@@ -57,7 +57,7 @@ set(${PROJECT_NAME}_INCLUDE_DIRS ${${PROJECT_NAME}_INCLUDE_DIRS} ${CMAKE_SOURCE_
 aux_source_directory(${CMAKE_SOURCE_DIR}/src library_sources)
 
 MACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
-  foreach( FILE_TO_COPY ad16.dmap ad16_scope_fmc25_r1224.mapp )
+  foreach( FILE_TO_COPY dummies.dmap ad16_scope_fmc25_r1224.mapp )
     configure_file( tests/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
   endforeach( FILE_TO_COPY )
   if(PYTHON_IS_ENABLED)
@@ -71,16 +71,12 @@ ENDMACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
 #Currently we assume that they are all tests contained in one file, so
 #each file gives a new executable. This section has to be adapted if this should change.
 if(TESTING_IS_ENABLED)
-#  include_directories(${CMAKE_SOURCE_DIR}/tests/include)
-#  aux_source_directory(${CMAKE_SOURCE_DIR}/tests/src testSources)
-#  add_library(${PROJECT_NAME}_TEST_LIBRARY ${testSources} )
-
   aux_source_directory(${CMAKE_SOURCE_DIR}/tests/executables_src testExecutables)
   foreach( testExecutableSrcFile ${testExecutables})
     #NAME_WE means the base name without path and (longest) extension
     get_filename_component(excutableName ${testExecutableSrcFile} NAME_WE)
     add_executable(${excutableName} ${testExecutableSrcFile})
-    target_link_libraries(${excutableName} ${MtcaMappedDevice_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} ${PROJECT_NAME})
+    target_link_libraries(${excutableName} ${mtca4u-deviceaccess_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} ${PROJECT_NAME})
     add_test(${excutableName} ${excutableName})
   endforeach( testExecutableSrcFile )
 
@@ -100,7 +96,7 @@ endif(TESTING_IS_ENABLED)
 # C++ library
 add_library(${PROJECT_NAME} SHARED ${library_sources} )
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
-target_link_libraries(${PROJECT_NAME} ${MtcaMappedDevice_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} ${Boost_PYTHON_LIBRARY})
+target_link_libraries(${PROJECT_NAME} ${mtca4u-deviceaccess_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} ${Boost_PYTHON_LIBRARY})
 
 #configure a header file which contains the version information for use in C++
 #configure_file(cmake/version.h.in "${PROJECT_BINARY_DIR}/version.h" @ONLY)
@@ -137,13 +133,6 @@ install(DIRECTORY ${${PROJECT_NAME}_INCLUDE_DIRS} DESTINATION include/${PROJECT_
 	  PATTERN ".svn" EXCLUDE
 	  PATTERN "${PROJECT_NAME}" EXCLUDE
 	  )
-
-#create the config files by filling the correct variables into the template (*.cmake.in)
-#All variables @VARIABLE@ are replaced with the current values, but they have to be set first....
-set(${PROJECT_NAME}_CONFIG_INCLUDE_DIRS ${MtcaMappedDevice_INCLUDE_DIRS})
-set(${PROJECT_NAME}_REFERENCE_HEADER "MotorDriverCard.h")
-set(${PROJECT_NAME}_CONFIG_LIBRARIES ${MtcaMappedDevice_LIBRARIES})
-set(${PROJECT_NAME}_CONFIG_LIBRARY_DIRS ${MtcaMappedDevice_LIBRARY_DIRS})
 
 # The instructions to create a debian package are loaded from a separate file
 #include(${CMAKE_SOURCE_DIR}/cmake/prepare_debian_package.cmake)
