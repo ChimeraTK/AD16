@@ -242,11 +242,25 @@ void DummyBackendTest::testAutoTriggerMode() {
   }
   BOOST_CHECK( !ERROR_FOUND );
 
-  // wait until another conversion is complete (this time via the trigger timer)
-  _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
-  _dummyBackend->timers.advance("trigger");
-  _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
-  BOOST_CHECK( lastBuffer != currentBuffer );
+  // wait until a few more conversions are complete, to verify it works not only once
+  for(int i=0; i<3; i++) {
+    do {
+      _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+      if( round(_dummyBackend->timers.getRemaining()*1000000.) != 10000 ) {
+        if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining()*1000000. << std::endl;
+        ERROR_FOUND = true;
+      }
+      _dummyBackend->timers.advance("strobe");
+    } while(currentBuffer == lastBuffer);
+  }
+
+  // wait until a few more conversions are complete (this time via the trigger timer)
+  for(int i=0; i<3; i++) {
+    _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
+    _dummyBackend->timers.advance("trigger");
+    _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+    BOOST_CHECK( lastBuffer != currentBuffer );
+  }
 
   _dummy.close();
 }
