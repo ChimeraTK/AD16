@@ -138,6 +138,7 @@ namespace mtca4u {
       DECLARE_STATE(TriggerSetup)
       DECLARE_STATE(TriggerUser)
       DECLARE_STATE(TriggerInternal)
+      DECLARE_STATE(TriggerInternal2)
 
       /// action: set the timer for the internal trigger
       DECLARE_ACTION(setTriggerTimer)
@@ -230,7 +231,10 @@ namespace mtca4u {
         TriggerUser() + onWriteUserTrigger() / executeTrigger(),
 
         // internal trigger mode
-        TriggerInternal() + onTrigger() / ( setTriggerTimer(), executeTrigger() )
+        // the intermediate state TriggerInternal2 is used as a workaround for Ubuntu 14 where running both actions
+        // together in the same transition seems not to work in some situations.
+        TriggerInternal() + onTrigger() / executeTrigger() == TriggerInternal2(),
+        TriggerInternal2() / setTriggerTimer() == TriggerInternal()
       ))
 
       /// define the state machine structure
