@@ -205,17 +205,18 @@ void DummyBackendTest::testAutoTriggerMode() {
   BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
 
   // wait until conversion is complete
-  int currentBuffer;
+  int currentBuffer = lastBuffer;
   bool ERROR_FOUND = false;
   do {
-    _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
     if( round(_dummyBackend->timers.getRemaining()*1000000.) != 10000 ) {
       if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining()*1000000. << std::endl;
       ERROR_FOUND = true;
     }
     _dummyBackend->timers.advance("strobe");
+    _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
   } while(currentBuffer == lastBuffer);
   BOOST_CHECK( !ERROR_FOUND );
+  BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
 
   // create accessor for multiplexed data
   boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
@@ -244,18 +245,21 @@ void DummyBackendTest::testAutoTriggerMode() {
 
   // wait until a few more conversions are complete, to verify it works not only once
   for(int i=0; i<3; i++) {
+    BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
+    lastBuffer = currentBuffer;
     do {
-      _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
       if( round(_dummyBackend->timers.getRemaining()*1000000.) != 10000 ) {
         if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining()*1000000. << std::endl;
         ERROR_FOUND = true;
       }
       _dummyBackend->timers.advance("strobe");
+      _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
     } while(currentBuffer == lastBuffer);
   }
 
   // wait until a few more conversions are complete (this time via the trigger timer)
   for(int i=0; i<3; i++) {
+    BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
     _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
     _dummyBackend->timers.advance("trigger");
     _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
