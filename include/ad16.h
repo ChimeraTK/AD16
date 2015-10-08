@@ -120,20 +120,20 @@ namespace mtca4u {
       boost::shared_ptr<Device> _device;
 
       /// control register accessors
-      BufferingRegisterAccessor<int> regReset;
-      BufferingRegisterAccessor<int> regAd16Enable;
+      boost::shared_ptr<Device::RegisterAccessor> regReset;
+      boost::shared_ptr<Device::RegisterAccessor> regAd16Enable;
       BufferingRegisterAccessor<int> regClockFrequency;  // [0] is the main clock, [1] is the SPI clock frequency in Hz
       BufferingRegisterAccessor<int> regTimingFrequency;
-      BufferingRegisterAccessor<int> regTimingInternalEnable;
-      BufferingRegisterAccessor<int> regTimingTriggerSelect;
-      BufferingRegisterAccessor<int> regTimingUserTrigger;
-      BufferingRegisterAccessor<int> regDaqEnable;
-      BufferingRegisterAccessor<int> regStrobeSelect;
-      BufferingRegisterAccessor<int> regCurrentBuffer;
-      BufferingRegisterAccessor<int> regReadModeA, regReadModeB;
-      BufferingRegisterAccessor<int> regTimingDivA, regTimingDivB;
-      BufferingRegisterAccessor<int> regOversamplingA, regOversamplingB;
-      BufferingRegisterAccessor<int> regVoltageRangeA, regVoltageRangeB;
+      boost::shared_ptr<Device::RegisterAccessor> regTimingInternalEnable;
+      boost::shared_ptr<Device::RegisterAccessor> regTimingTriggerSelect;
+      boost::shared_ptr<Device::RegisterAccessor> regTimingUserTrigger;
+      boost::shared_ptr<Device::RegisterAccessor> regDaqEnable;
+      boost::shared_ptr<Device::RegisterAccessor> regStrobeSelect;
+      boost::shared_ptr<Device::RegisterAccessor> regCurrentBuffer;
+      boost::shared_ptr<Device::RegisterAccessor> regReadModeA, regReadModeB;
+      boost::shared_ptr<Device::RegisterAccessor> regTimingDivA, regTimingDivB;
+      boost::shared_ptr<Device::RegisterAccessor> regOversamplingA, regOversamplingB;
+      boost::shared_ptr<Device::RegisterAccessor> regVoltageRangeA, regVoltageRangeB;
 
       /// accessor for multiplexed data
       boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > _dataDemuxed;
