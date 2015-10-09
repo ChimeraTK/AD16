@@ -36,9 +36,11 @@ namespace mtca4u {
           trigger(this),
           timers(this),
           regReset(this,"BOARD0","WORD_RESET_N"),
+          regEnableDaq(this,"APP0","WORD_DAQ_ENABLE"),
           regTrigSel(this,"APP0","WORD_TIMING_TRG_SEL"),
           regTrigFreq(this,"APP0","WORD_TIMING_FREQ"),
           regTrigIntEna(this, "APP0","WORD_TIMING_INT_ENA"),
+          regTrigUser(this,"APP0","WORD_TIMING_USER_TRG"),
           regSamplingFreqA(this,"AD160","WORD_ADC_A_TIMING_DIV"),
           regBufferA(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA"),
           regBufferB(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB"),
@@ -106,9 +108,11 @@ namespace mtca4u {
 
       /// register accessors
       DECLARE_REGISTER(int, regReset)             // BOARD0.WORD_RESET_N
+      DECLARE_REGISTER(int, regEnableDaq)         // APP0.WORD_DAQ_ENABLE
       DECLARE_REGISTER(int, regTrigSel)           // APP0.WORD_TIMING_TRG_SEL
       DECLARE_REGISTER(int, regTrigFreq)          // APP0.WORD_TIMING_FREQ
       DECLARE_REGISTER(int, regTrigIntEna)        // APP0.WORD_TIMING_INT_ENA -> only used in testLibrary
+      DECLARE_REGISTER(int, regTrigUser)          // APP0.WORD_TIMING_USER_TRG
       DECLARE_REGISTER(int, regSamplingFreqA)     // AD160.WORD_ADC_A_TIMING_DIV
       DECLARE_REGISTER(int, regBufferA)           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA
       DECLARE_REGISTER(int, regBufferB)           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB
@@ -117,11 +121,11 @@ namespace mtca4u {
 
       /// connect on-write events with register names
       WRITEEVENT_TABLE
-        CONNECT_REGISTER_EVENT(onWriteReset, "BOARD0","WORD_RESET_N")
-        CONNECT_REGISTER_EVENT(onWriteDaqEnable, "APP0","WORD_DAQ_ENABLE")
-        CONNECT_REGISTER_EVENT(onWriteTrigSel, "APP0","WORD_TIMING_TRG_SEL")
-        CONNECT_REGISTER_EVENT(onWriteUserTrigger, "APP0","WORD_TIMING_USER_TRG")
-        CONNECT_REGISTER_EVENT(onWriteTrigFreq, "APP0","WORD_TIMING_FREQ")
+        CONNECT_REGISTER_EVENT(onWriteReset, regReset)
+        CONNECT_REGISTER_EVENT(onWriteDaqEnable, regEnableDaq)
+        CONNECT_REGISTER_EVENT(onWriteTrigSel, regTrigSel)
+        CONNECT_REGISTER_EVENT(onWriteUserTrigger, regTrigUser)
+        CONNECT_REGISTER_EVENT(onWriteTrigFreq, regTrigFreq)
       END_WRITEEVENT_TABLE
 
       /// Guards for register values
