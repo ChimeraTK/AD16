@@ -132,8 +132,8 @@ namespace mtca4u {
       DECLARE_REGISTER_GUARD( regIsTrue, value != 0 )            // for use with any boolean register
       DECLARE_REGISTER_GUARD( regIsFalse, value == 0 )           // for use with any boolean register
 
-      DECLARE_REGISTER_GUARD( userTriggerSelected, dev->regTrigSel == 8 )
-      DECLARE_REGISTER_GUARD( internalTriggerSelected, dev->regTrigSel == 0 )
+      DECLARE_REGISTER_GUARD( userTriggerSelected, regTrigSel == 8 )
+      DECLARE_REGISTER_GUARD( internalTriggerSelected, regTrigSel == 0 )
 
       /// states
       DECLARE_STATE(DaqStopped)
@@ -146,66 +146,66 @@ namespace mtca4u {
 
       /// action: set the timer for the internal trigger
       DECLARE_ACTION(setTriggerTimer)
-        int fdiv = dev->regTrigFreq[dev->regTrigSel];
-        dev->trigger.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        int fdiv = regTrigFreq[regTrigSel];
+        trigger.set( 1.e3 * (fdiv+1.) / clockFrequency );
       END_DECLARE_ACTION
 
       /// action: set the strobe timer
       DECLARE_ACTION(setStrobeTimer)
-        int fdiv = dev->regSamplingFreqA;
-        dev->strobe.set( 1.e3 * (fdiv+1.) / dev->clockFrequency );
+        int fdiv = regSamplingFreqA;
+        strobe.set( 1.e3 * (fdiv+1.) / clockFrequency );
         END_DECLARE_ACTION
 
       /// action: fill a single sample per channel into the buffer
       DECLARE_ACTION(fillBuffer)
         // do nothing if buffer is already full
-        if(dev->currentOffset >= numberOfSamples) return;
+        if(currentOffset >= numberOfSamples) return;
         // fill the buffer
         for(int ic=0; ic<numberOfChannels; ic++) {
           int32_t ival;
           if(ic == 0) {
-            ival = 1000.*sin(2.*acos(-1) * 1000. * (float)dev->currentOffset/(float)numberOfSamples);
+            ival = 1000.*sin(2.*acos(-1) * 1000. * (float)currentOffset/(float)numberOfSamples);
           }
           else if(ic == 1) {
-            ival = dev->currentOffset;
+            ival = currentOffset;
           }
           else if(ic == 2) {
-            ival = dev->testValue;
+            ival = testValue;
           }
           else if(ic == 3) {
-            ival = dev->testValue;
+            ival = testValue;
           }
           else {
-            ival = dev->uniform(dev->rng);
+            ival = uniform(rng);
           }
-          int ioffset = dev->currentOffset*numberOfChannels + ic;
+          int ioffset = currentOffset*numberOfChannels + ic;
           // write to the right buffer
-          if(dev->regCurBuffer == 0) {
-            dev->regBufferA[ioffset] = ival;
+          if(regCurBuffer == 0) {
+            regBufferA[ioffset] = ival;
           }
           else {
-            dev->regBufferB[ioffset] = ival;
+            regBufferB[ioffset] = ival;
           }
         }
         // increment the offset
-        dev->currentOffset++;
+        currentOffset++;
       END_DECLARE_ACTION
 
       /// action: execute trigger
       DECLARE_ACTION(executeTrigger)
         // change current buffer
-        dev->regCurBuffer = ( dev->regCurBuffer == 0 ? 1 : 0 );
+        regCurBuffer = ( regCurBuffer == 0 ? 1 : 0 );
         // reset offset
-        dev->currentOffset = 0;
+        currentOffset = 0;
         // increment trigger counter
-        dev->triggerCounter++;
+        triggerCounter++;
       END_DECLARE_ACTION
 
       DECLARE_ACTION(resetDevice)
-        dev->regCurBuffer = 0;
-        dev->currentOffset = 0;
-        dev->strobe.clear();
-        dev->trigger.clear();
+        regCurBuffer = 0;
+        currentOffset = 0;
+        strobe.clear();
+        trigger.clear();
       END_DECLARE_ACTION
 
       /// define the state machine structure
