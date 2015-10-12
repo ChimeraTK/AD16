@@ -235,10 +235,7 @@ namespace mtca4u {
         TriggerUser() + onWriteUserTrigger() / executeTrigger(),
 
         // internal trigger mode
-        // the intermediate state TriggerInternal2 is used as a workaround for Ubuntu 14 where running both actions
-        // together in the same transition seems not to work in some situations.
-        TriggerInternal() + onTrigger() / executeTrigger() == TriggerInternal2(),
-        TriggerInternal2() / setTriggerTimer() == TriggerInternal()
+        TriggerInternal() + onTrigger() / ( executeTrigger(), setTriggerTimer() )
       ))
 
       /// define the state machine structure
