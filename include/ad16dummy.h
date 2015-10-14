@@ -1,13 +1,15 @@
-#ifndef AD16_DUMMY_DEVICE_H
-#define AD16_DUMMY_DEVICE_H
+#ifndef AD16_DUMMY_H
+#define AD16_DUMMY_H
 
+#include <vector>
 #include <string>
-#include <float.h>
-#include <math.h>
+#include <algorithm>
+//#include <float.h>
+//#include <math.h>
 
 #include <mtca4uVirtualLab/VirtualLabBackend.h>
-#include <boost/random/uniform_int.hpp>
-#include <boost/random/mersenne_twister.hpp>
+#include <mtca4uVirtualLab/SignalSink.h>
+#include <boost/make_shared.hpp>
 
 namespace msm = boost::msm;
 namespace mpl = boost::mpl;
@@ -26,12 +28,10 @@ namespace mtca4u {
     public:
 
       CONSTRUCTOR(ad16dummy,
-          uniform(0, (1<<18) - 1),    // 18 bit random number
           currentOffset(0),
+          conversionFactor(0.),
           clockFrequency(50000000),
           spiFrequency(25000000),
-          testValue(999),
-          triggerCounter(0),
           strobe(this),
           trigger(this),
           timers(this),
@@ -45,8 +45,15 @@ namespace mtca4u {
           regBufferA(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCA"),
           regBufferB(this,"APP0","AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB"),
           regCurBuffer(this,"APP0","WORD_DAQ_CURR_BUF"),
-          regBaseClockFreq(this,"AD160","WORD_CLK_FREQ")
+          regBaseClockFreq(this,"AD160","WORD_CLK_FREQ"),
+          regVoltageRangeA(this,"AD160","WORD_ADC_A_VOL_RANGE")
       )
+        // initialise the signal sinks
+        for(int i=0; i<numberOfChannels; i++) {
+          sinks.push_back( boost::make_shared<SignalSink>(0) );
+        }
+
+        // initialise DAQ state machine
         INIT_SUB_STATE_MACHINE(theDaq)
 
         // set default values (to match the fresh registers, they will be initialised with 0 on open)
@@ -58,10 +65,6 @@ namespace mtca4u {
         regBaseClockFreq[1] = spiFrequency;
       END_CONSTRUCTOR
 
-      /// random number generator to fill channels with white noise
-      boost::mt11213b rng;
-      boost::uniform_int<> uniform;    // 18 bit random number
-
       /// current offset into the buffer (i.e. sample number)
       int32_t currentOffset;
 
@@ -72,6 +75,13 @@ namespace mtca4u {
       /// number of samples per buffer and channel
       const static int32_t numberOfSamples = 65536;
 
+      /// Possible voltage ranges
+      enum _voltageRange { RANGE_5Vpp=0, RANGE_10Vpp=1 };
+      typedef enum _voltageRange voltageRange;
+
+      /// conversion factor from Volts into digits
+      double conversionFactor;
+
       /// ADC clock frequency in Hz (-> WORD_CLK_FREQ[0])
       /// Defaults to 50 MHz but can be changed by the tests to make sure the library works with any frequency. It must
       /// be changed before the call to openDev() happens to be written to the register correctly!
@@ -81,12 +91,6 @@ namespace mtca4u {
       /// Defaults to 50 MHz but can be changed by the tests to make sure the library works with any frequency. It must
       /// be changed before the call to openDev() happens to be written to the register correctly!
       int32_t spiFrequency;
-
-      /// some test value to be written to the 3rd channel
-      int32_t testValue;
-
-      /// trigger counter, will be written into the 4th channel
-      int32_t triggerCounter;
 
       /// event fired on a trigger (-> swap buffers)
       DECLARE_EVENT(onTrigger)
@@ -105,6 +109,7 @@ namespace mtca4u {
       DECLARE_EVENT(onWriteUserTrigger)
       DECLARE_EVENT(onWriteTrigSel)
       DECLARE_EVENT(onWriteTrigFreq)
+      DECLARE_EVENT(onWriteVoltageRange)
 
       /// register accessors
       DECLARE_REGISTER(int, regReset)             // BOARD0.WORD_RESET_N
@@ -118,6 +123,7 @@ namespace mtca4u {
       DECLARE_REGISTER(int, regBufferB)           // APP0.AREA_MULTIPLEXED_SEQUENCE_DAQ0_ADCB
       DECLARE_REGISTER(int, regCurBuffer)         // APP0.WORD_DAQ_CURR_BUF
       DECLARE_REGISTER(int, regBaseClockFreq)     // AD160.WORD_CLK_FREQ
+      DECLARE_REGISTER(int, regVoltageRangeA)     // AD160.WORD_ADC_A_VOL_RANGE
 
       /// connect on-write events with register names
       WRITEEVENT_TABLE
@@ -126,6 +132,7 @@ namespace mtca4u {
         CONNECT_REGISTER_EVENT(onWriteTrigSel, regTrigSel)
         CONNECT_REGISTER_EVENT(onWriteUserTrigger, regTrigUser)
         CONNECT_REGISTER_EVENT(onWriteTrigFreq, regTrigFreq)
+        CONNECT_REGISTER_EVENT(onWriteVoltageRange, regVoltageRangeA)
       END_WRITEEVENT_TABLE
 
       /// Guards for register values
@@ -142,7 +149,6 @@ namespace mtca4u {
       DECLARE_STATE(TriggerSetup)
       DECLARE_STATE(TriggerUser)
       DECLARE_STATE(TriggerInternal)
-      DECLARE_STATE(TriggerInternal2)
 
       /// action: set the timer for the internal trigger
       DECLARE_ACTION(setTriggerTimer)
@@ -154,7 +160,10 @@ namespace mtca4u {
       DECLARE_ACTION(setStrobeTimer)
         int fdiv = regSamplingFreqA;
         strobe.set( 1.e3 * (fdiv+1.) / clockFrequency );
-        END_DECLARE_ACTION
+      END_DECLARE_ACTION
+
+      /// signal sinks: the ad16 has 16 inputs
+      std::vector< boost::shared_ptr<SignalSink> > sinks;
 
       /// action: fill a single sample per channel into the buffer
       DECLARE_ACTION(fillBuffer)
@@ -162,22 +171,7 @@ namespace mtca4u {
         if(currentOffset >= numberOfSamples) return;
         // fill the buffer
         for(int ic=0; ic<numberOfChannels; ic++) {
-          int32_t ival;
-          if(ic == 0) {
-            ival = 1000.*sin(2.*acos(-1) * 1000. * (float)currentOffset/(float)numberOfSamples);
-          }
-          else if(ic == 1) {
-            ival = currentOffset;
-          }
-          else if(ic == 2) {
-            ival = testValue;
-          }
-          else if(ic == 3) {
-            ival = testValue;
-          }
-          else {
-            ival = uniform(rng);
-          }
+          int32_t ival = std::round( sinks[ic]->getValue(trigger.getCurrent()) * conversionFactor );
           int ioffset = currentOffset*numberOfChannels + ic;
           // write to the right buffer
           if(regCurBuffer == 0) {
@@ -197,8 +191,16 @@ namespace mtca4u {
         regCurBuffer = ( regCurBuffer == 0 ? 1 : 0 );
         // reset offset
         currentOffset = 0;
-        // increment trigger counter
-        triggerCounter++;
+      END_DECLARE_ACTION
+
+      DECLARE_ACTION(configureInputRange)
+        // compute conversion factor
+        if(regVoltageRangeA == voltageRange::RANGE_5Vpp) {
+          conversionFactor = pow(2., 17) / 5.;  // 18 bits signed
+        }
+        else {
+          conversionFactor = pow(2., 17) / 10.;
+        }
       END_DECLARE_ACTION
 
       DECLARE_ACTION(resetDevice)
@@ -212,8 +214,8 @@ namespace mtca4u {
       DECLARE_STATE_MACHINE(theDaq, DaqSetup() << TriggerSetup(), (
         // =======================================================================================================
         // DAQ region
-        // setup the DAQ by starting the strobe timer
-        DaqSetup() / setStrobeTimer() == DaqRunning(),
+        // setup the DAQ by starting the strobe timer and configure voltage range
+        DaqSetup() / ( setStrobeTimer(), configureInputRange() ) == DaqRunning(),
 
         // receive strobe: fill the buffer and restart the timer
         DaqRunning() + onStrobe() / fillBuffer() == DaqSetup(),
@@ -246,7 +248,10 @@ namespace mtca4u {
 
         // start and stop the DAQ
         DaqStopped() + onWriteDaqEnable() [ regIsTrue() ] == theDaq(),
-        theDaq() + onWriteDaqEnable() [ regIsFalse() ] == DaqStopped()
+        theDaq() + onWriteDaqEnable() [ regIsFalse() ] == DaqStopped(),
+
+        // update input range selector
+        theDaq() + onWriteVoltageRange() / configureInputRange()
       ))
 
   };
@@ -254,4 +259,4 @@ namespace mtca4u {
 
 }//namespace mtca4u
 
-#endif // AD16_DUMMY_DEVICE_H
+#endif // AD16_DUMMY_H

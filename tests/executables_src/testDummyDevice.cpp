@@ -7,11 +7,13 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <mtca4u/Device.h>
+#include <mtca4uVirtualLab/SignalSource.h>
 
 #include "ad16dummy.h"
 
 using namespace boost::unit_test_framework;
 using namespace mtca4u;
+using namespace mtca4u::VirtualLab;
 
 #define DUMMY_ALIAS "DUMMY"
 
@@ -35,7 +37,7 @@ class DummyBackendTest {
 };
 
 /**********************************************************************************************************************/
-class  DummyDeviceTestSuite : public test_suite {
+class DummyDeviceTestSuite : public test_suite {
   public:
     DummyDeviceTestSuite() : test_suite("DummyDevice test suite") {
       boost::shared_ptr<DummyBackendTest> dummyDeviceTest( new DummyBackendTest );
@@ -53,6 +55,33 @@ test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/ [] )
 
   return NULL;
 }
+
+/**********************************************************************************************************************/
+class TestSignalGenerator {
+  public:
+    boost::shared_ptr<SignalSource> constant;
+    boost::shared_ptr<SignalSource> sampleCounter;
+
+    TestSignalGenerator() {
+      constant = boost::make_shared<SignalSource>();
+      constant->setCallback( boost::bind(&TestSignalGenerator::constantCallback, this, _1) );
+      sampleCounter = boost::make_shared<SignalSource>();
+      sampleCounter->setCallback( boost::bind(&TestSignalGenerator::sampleCounterCallback, this, _1) );
+      sampleCount = 0;
+      constValue = 1;
+    }
+
+    double constantCallback(double) {
+      return (double)constValue / pow(2., 17) * 5.;
+    }
+
+    double sampleCounterCallback(double) {
+      return (double)(sampleCount++) / pow(2., 17) * 5.;
+    }
+
+    int sampleCount;
+    int constValue;
+};
 
 /**********************************************************************************************************************/
 void DummyBackendTest::openDevice() {
@@ -106,8 +135,10 @@ void DummyBackendTest::testSoftwareTriggeredMode() {
   std::cout << "testSoftwareTriggeredMode" << std::endl;
   openDevice();
 
-  // set test value of dummy device (to have something changing between the tests). Will be the content of the 3rd channel
-  _dummyBackend->testValue = 1;
+  // create and connect signal generator
+  TestSignalGenerator generator;
+  _dummyBackend->sinks[1]->connect(generator.sampleCounter);
+  _dummyBackend->sinks[2]->connect(generator.constant);
 
   // select ADCA ready as DAQ strobe
   _dummy.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA
@@ -177,10 +208,14 @@ void DummyBackendTest::testSoftwareTriggeredMode() {
 void DummyBackendTest::testAutoTriggerMode() {
   std::cout << "testAutoTriggerMode" << std::endl;
   openDevice();
-  _dummy.getRegisterAccessor("WORD_RESET_N","BOARD0")->write(0);        // reset
 
-  // set test value of dummy device (to have something changing between the tests). Will be the content of the 3rd channel
-  _dummyBackend->testValue = 2;
+  // create and connect signal generator
+  TestSignalGenerator generator;
+  _dummyBackend->sinks[1]->connect(generator.sampleCounter);
+  _dummyBackend->sinks[2]->connect(generator.constant);
+  generator.constValue = 2;
+
+  _dummy.getRegisterAccessor("WORD_RESET_N","BOARD0")->write(0);        // reset
 
   // select ADCA ready as DAQ strobe
   _dummy.getRegisterAccessor("WORD_DAQ_STR_SEL","APP0")->write(0);        // DAQ_STROBE_ADCA

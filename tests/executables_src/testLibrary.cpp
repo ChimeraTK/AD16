@@ -55,6 +55,26 @@ test_suite* init_unit_test_suite(int /*argc*/, char* /*argv*/[]) {
 }
 
 /**********************************************************************************************************************/
+class TestSignalGenerator {
+  public:
+    boost::shared_ptr<SignalSource> sampleCounter;
+
+    TestSignalGenerator() {
+      sampleCounter = boost::make_shared<SignalSource>();
+      sampleCounter->setCallback( boost::bind(&TestSignalGenerator::sampleCounterCallback, this, _1) );
+      sampleCount = 0;
+      maxVoltage = 5.;
+    }
+
+    double sampleCounterCallback(double) {
+      return (double)(sampleCount++) / pow(2., 17) * maxVoltage;
+    }
+
+    int sampleCount;
+    double maxVoltage;
+};
+
+/**********************************************************************************************************************/
 void Ad16Test::testExceptions() {
   std::cout << "testExceptions" << std::endl;
 
@@ -213,8 +233,14 @@ void Ad16Test::testSoftwareTriggeredMode() {
   // open device
   ad.open(DUMMY_ALIAS);
 
-  // setup software trigger
+  // create and connect signal generator
+  TestSignalGenerator generator;
+  generator.maxVoltage = 5.;
+  backend->sinks[1]->connect(generator.sampleCounter);
+
+  // setup user trigger
   ad.setTriggerMode(ad16::USER);
+  ad.setVoltageRange(ad16::RANGE_5Vpp);
 
   // enable the DAQ
   ad.enableDaq();
@@ -228,7 +254,7 @@ void Ad16Test::testSoftwareTriggeredMode() {
   // read data
   ad.read();
 
-  // compare first channel data
+  // compare second channel's data
   std::vector<int> data = ad.getChannelData(1);
   bool FOUND_ERROR = false;
   for(uint columnCount = 0; columnCount < data.size(); ++columnCount) {
@@ -248,8 +274,14 @@ void Ad16Test::testPeriodicTriggeredMode() {
   // open device
   ad.open(DUMMY_ALIAS);
 
-  // setup software trigger
+  // create and connect signal generator
+  TestSignalGenerator generator;
+  generator.maxVoltage = 10.;
+  backend->sinks[1]->connect(generator.sampleCounter);
+
+  // setup software trigger and voltage range
   ad.setTriggerMode(ad16::PERIODIC, 1.);    // 1 Hz
+  ad.setVoltageRange(ad16::RANGE_10Vpp);
 
   // enable the DAQ
   ad.enableDaq();
@@ -262,7 +294,7 @@ void Ad16Test::testPeriodicTriggeredMode() {
   // read data
   ad.read();
 
-  // compare first channel data
+  // compare second channel's data
   std::vector<int> data = ad.getChannelData(1);
   bool FOUND_ERROR = false;
   for(uint columnCount = 0; columnCount < data.size(); ++columnCount) {
