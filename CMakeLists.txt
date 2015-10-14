@@ -76,7 +76,7 @@ if(TESTING_IS_ENABLED)
     #NAME_WE means the base name without path and (longest) extension
     get_filename_component(excutableName ${testExecutableSrcFile} NAME_WE)
     add_executable(${excutableName} ${testExecutableSrcFile})
-    target_link_libraries(${excutableName} ${mtca4u-deviceaccess_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} ${PROJECT_NAME})
+    target_link_libraries(${excutableName} ${mtca4u-deviceaccess_LIBRARIES} ${mtca4uVirtualLab_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} ${PROJECT_NAME})
     add_test(${excutableName} ${excutableName})
   endforeach( testExecutableSrcFile )
 
@@ -96,7 +96,7 @@ endif(TESTING_IS_ENABLED)
 # C++ library
 add_library(${PROJECT_NAME} SHARED ${library_sources} )
 set_target_properties(${PROJECT_NAME} PROPERTIES VERSION ${${PROJECT_NAME}_VERSION} SOVERSION ${${PROJECT_NAME}_SOVERSION})
-target_link_libraries(${PROJECT_NAME} ${mtca4u-deviceaccess_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} ${Boost_PYTHON_LIBRARY})
+target_link_libraries(${PROJECT_NAME} ${mtca4u-deviceaccess_LIBRARIES} ${mtca4uVirtualLab_LIBRARIES} ${Boost_LIBRARIES} ${PYTHON_LIBRARIES} ${Boost_PYTHON_LIBRARY})
 
 #configure a header file which contains the version information for use in C++
 #configure_file(cmake/version.h.in "${PROJECT_BINARY_DIR}/version.h" @ONLY)
