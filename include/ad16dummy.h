@@ -153,13 +153,13 @@ namespace mtca4u {
       /// action: set the timer for the internal trigger
       DECLARE_ACTION(setTriggerTimer)
         int fdiv = regTrigFreq[regTrigSel];
-        trigger.set( 1.e3 * (fdiv+1.) / clockFrequency );
+        trigger.set( (fdiv+1.) / clockFrequency * seconds );
       END_DECLARE_ACTION
 
       /// action: set the strobe timer
       DECLARE_ACTION(setStrobeTimer)
         int fdiv = regSamplingFreqA;
-        strobe.set( 1.e3 * (fdiv+1.) / clockFrequency );
+        strobe.set( (fdiv+1.) / clockFrequency * seconds );
       END_DECLARE_ACTION
 
       /// signal sinks: the ad16 has 16 inputs

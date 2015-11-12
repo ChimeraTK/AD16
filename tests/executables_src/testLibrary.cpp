@@ -66,7 +66,7 @@ class TestSignalGenerator {
       maxVoltage = 5.;
     }
 
-    double sampleCounterCallback(double) {
+    double sampleCounterCallback(VirtualTime) {
       return (double)(sampleCount++) / pow(2., 17) * maxVoltage;
     }
 

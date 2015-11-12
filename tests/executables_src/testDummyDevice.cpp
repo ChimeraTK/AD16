@@ -71,11 +71,11 @@ class TestSignalGenerator {
       constValue = 1;
     }
 
-    double constantCallback(double) {
+    double constantCallback(VirtualTime) {
       return (double)constValue / pow(2., 17) * 5.;
     }
 
-    double sampleCounterCallback(double) {
+    double sampleCounterCallback(VirtualTime) {
       return (double)(sampleCount++) / pow(2., 17) * 5.;
     }
 
@@ -159,8 +159,8 @@ void DummyBackendTest::testSoftwareTriggeredMode() {
   // advance dummy strobe timing until buffer is full
   bool ERROR_FOUND = false;
   for(int i=0; i<65536; i++) {
-    if( round(_dummyBackend->timers.getRemaining()*1000000.) != 20000 ) {
-      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining()*1000000. << std::endl;
+    if( _dummyBackend->timers.getRemaining() != 20*microseconds ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining() << std::endl;
       ERROR_FOUND = true;
     }
     _dummyBackend->timers.advance("strobe");
@@ -237,21 +237,21 @@ void DummyBackendTest::testAutoTriggerMode() {
   _dummy.getRegisterAccessor("WORD_DAQ_ENABLE","APP0")->write(1);
 
   // check trigger timing
-  BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
+  BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
 
   // wait until conversion is complete
   int currentBuffer = lastBuffer;
   bool ERROR_FOUND = false;
   do {
-    if( round(_dummyBackend->timers.getRemaining()*1000000.) != 10000 ) {
-      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining()*1000000. << std::endl;
+    if( _dummyBackend->timers.getRemaining() != 10*microseconds ) {
+      if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining() << std::endl;
       ERROR_FOUND = true;
     }
     _dummyBackend->timers.advance("strobe");
     _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
   } while(currentBuffer == lastBuffer);
   BOOST_CHECK( !ERROR_FOUND );
-  BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
+  BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
 
   // create accessor for multiplexed data
   boost::shared_ptr< mtca4u::MultiplexedDataAccessor<int32_t> > dataDemuxed;
@@ -280,11 +280,11 @@ void DummyBackendTest::testAutoTriggerMode() {
 
   // wait until a few more conversions are complete, to verify it works not only once
   for(int i=0; i<3; i++) {
-    BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
+    BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
     lastBuffer = currentBuffer;
     do {
-      if( round(_dummyBackend->timers.getRemaining()*1000000.) != 10000 ) {
-        if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining()*1000000. << std::endl;
+      if( _dummyBackend->timers.getRemaining() != 10*microseconds ) {
+        if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining() << std::endl;
         ERROR_FOUND = true;
       }
       _dummyBackend->timers.advance("strobe");
@@ -294,7 +294,7 @@ void DummyBackendTest::testAutoTriggerMode() {
 
   // wait until a few more conversions are complete (this time via the trigger timer)
   for(int i=0; i<3; i++) {
-    BOOST_CHECK( round(_dummyBackend->trigger.getRemaining()*1000000.) == 1000000000. );
+    BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
     _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
     _dummyBackend->timers.advance("trigger");
     _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
