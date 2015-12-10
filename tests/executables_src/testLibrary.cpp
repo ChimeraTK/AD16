@@ -13,6 +13,7 @@ using namespace mtca4u;
 
 #define DUMMY_ALIAS "DUMMY"
 #define DUMMY_ALIAS_WRONG "WRONG_DUMMY"
+#define TEST_DMAP_FILE "dummies.dmap"
 
 /**********************************************************************************************************************/
 class Ad16Test {
@@ -48,7 +49,9 @@ class Ad16TestSuite: public test_suite {
 
 /**********************************************************************************************************************/
 test_suite* init_unit_test_suite(int /*argc*/, char* /*argv*/[]) {
-  framework::master_test_suite().p_name.value = "AD16 DummyDevice test suite";
+  mtca4u::BackendFactory::getInstance().setDMapFilePath(TEST_DMAP_FILE);
+
+  framework::master_test_suite().p_name.value = "AD16 library test suite";
   framework::master_test_suite().add(new Ad16TestSuite);
 
   return NULL;

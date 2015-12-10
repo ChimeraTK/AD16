@@ -16,6 +16,7 @@ using namespace mtca4u;
 using namespace mtca4u::VirtualLab;
 
 #define DUMMY_ALIAS "DUMMY"
+#define TEST_DMAP_FILE "dummies.dmap"
 
 /**********************************************************************************************************************/
 class DummyBackendTest {
@@ -50,6 +51,8 @@ class DummyDeviceTestSuite : public test_suite {
 /**********************************************************************************************************************/
 test_suite* init_unit_test_suite( int /*argc*/, char* /*argv*/ [] )
 {
+  mtca4u::BackendFactory::getInstance().setDMapFilePath(TEST_DMAP_FILE);
+
   framework::master_test_suite().p_name.value = "AD16 DummyDevice test suite";
   framework::master_test_suite().add(new DummyDeviceTestSuite);
 
