@@ -11,9 +11,6 @@
 #include <mtca4uVirtualLab/SignalSink.h>
 #include <boost/make_shared.hpp>
 
-namespace msm = boost::msm;
-namespace mpl = boost::mpl;
-
 using namespace mtca4u::VirtualLab;
 
 namespace mtca4u {
