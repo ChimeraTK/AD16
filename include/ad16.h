@@ -7,6 +7,7 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 
 #include <mtca4u/Device.h>
+#include <mtca4u/MultiplexedDataAccessor.h>
 #include <mtca4u/BufferingRegisterAccessor.h>
 #include <mtca4u/PcieBackend.h>
 
