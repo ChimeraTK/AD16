@@ -8,7 +8,7 @@
 
 #include <mtca4u/Device.h>
 #include <mtca4u/MultiplexedDataAccessor.h>
-#include <mtca4uVirtualLab/SignalSource.h>
+#include <mtca4u/VirtualLab/SignalSource.h>
 
 #include "ad16dummy.h"
 

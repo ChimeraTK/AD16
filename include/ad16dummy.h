@@ -7,8 +7,8 @@
 //#include <float.h>
 //#include <math.h>
 
-#include <mtca4uVirtualLab/VirtualLabBackend.h>
-#include <mtca4uVirtualLab/SignalSink.h>
+#include <mtca4u/VirtualLab/VirtualLabBackend.h>
+#include <mtca4u/VirtualLab/SignalSink.h>
 #include <boost/make_shared.hpp>
 
 using namespace mtca4u::VirtualLab;
