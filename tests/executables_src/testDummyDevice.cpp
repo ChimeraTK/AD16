@@ -233,8 +233,8 @@ void DummyBackendTest::testAutoTriggerMode() {
   _dummy.getRegisterAccessor("WORD_ADC_B_TIMING_DIV","AD160")->write(499);
 
   // obtain current buffer
-  int lastBuffer;
-  _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
+  auto lastBuffer =  _dummy.getScalarRegisterAccessor<int32_t>("APP0/WORD_DAQ_CURR_BUF");
+  lastBuffer.read();
   std::cout << "lastBuffer = " << lastBuffer << std::endl; std::cerr << std::flush;
 
   // enable DAQ
@@ -285,7 +285,9 @@ void DummyBackendTest::testAutoTriggerMode() {
   // wait until a few more conversions are complete, to verify it works not only once
   for(int i=0; i<3; i++) {
     BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
-    lastBuffer = currentBuffer;
+    // fixme: the normal assignment operator would replace the whole accessor, which is not what we want.
+    // We have to force it to using the int implementation
+    lastBuffer = static_cast<int>(currentBuffer);
     do {
       if( _dummyBackend->timers.getRemaining() != 10*microseconds ) {
         if(!ERROR_FOUND) std::cerr << "Wrong strobe timing: " << _dummyBackend->timers.getRemaining() << std::endl;
@@ -299,7 +301,7 @@ void DummyBackendTest::testAutoTriggerMode() {
   // wait until a few more conversions are complete (this time via the trigger timer)
   for(int i=0; i<3; i++) {
     BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
-    _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
+    lastBuffer.read();
     _dummyBackend->timers.advance("trigger");
     currentBuffer.read();
     BOOST_CHECK( lastBuffer != currentBuffer );
