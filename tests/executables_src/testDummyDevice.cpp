@@ -244,7 +244,7 @@ void DummyBackendTest::testAutoTriggerMode() {
   BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
 
   // wait until conversion is complete
-  int currentBuffer = lastBuffer;
+  auto currentBuffer = _dummy.getScalarRegisterAccessor<int32_t>("APP0/WORD_DAQ_CURR_BUF");
   bool ERROR_FOUND = false;
   do {
     if( _dummyBackend->timers.getRemaining() != 10*microseconds ) {
@@ -252,7 +252,7 @@ void DummyBackendTest::testAutoTriggerMode() {
       ERROR_FOUND = true;
     }
     _dummyBackend->timers.advance("strobe");
-    _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+    currentBuffer.read();
   } while(currentBuffer == lastBuffer);
   BOOST_CHECK( !ERROR_FOUND );
   BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
@@ -292,7 +292,7 @@ void DummyBackendTest::testAutoTriggerMode() {
         ERROR_FOUND = true;
       }
       _dummyBackend->timers.advance("strobe");
-      _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+      currentBuffer.read();
     } while(currentBuffer == lastBuffer);
   }
 
@@ -301,7 +301,7 @@ void DummyBackendTest::testAutoTriggerMode() {
     BOOST_CHECK( _dummyBackend->trigger.getRemaining() == 1*seconds );
     _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&lastBuffer);
     _dummyBackend->timers.advance("trigger");
-    _dummy.getRegisterAccessor("WORD_DAQ_CURR_BUF","APP0")->read(&currentBuffer);
+    currentBuffer.read();
     BOOST_CHECK( lastBuffer != currentBuffer );
   }
 
