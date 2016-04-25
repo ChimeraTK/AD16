@@ -28,7 +28,6 @@ BOOST_PYTHON_MODULE(libad16)
 {
 
   class_<ad16, boost::noncopyable>("ad16")
-    .def("openDmap",&ad16::openDmap)
     .def("open",&ad16::open)
     .def("close",&ad16::close)
     .def("setSamplingRate",&ad16::setSamplingRate, setSamplingRate_overloads(args("rate","oversampling")) )

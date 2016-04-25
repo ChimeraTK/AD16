@@ -1,8 +1,7 @@
 PROJECT(ad16)
 cmake_minimum_required(VERSION 2.8)
 
-#LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_PREFIX}")
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake) 
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/Modules)
 
 set(${PROJECT_NAME}_MAJOR_VERSION 00)
 set(${PROJECT_NAME}_MINOR_VERSION 01)
@@ -19,10 +18,10 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 --coverage")
 # linker flags
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--export-dynamic")
 
-FIND_PACKAGE(mtca4u-deviceaccess 00.00 REQUIRED)
+FIND_PACKAGE(mtca4u-deviceaccess 00.11 REQUIRED)
 include_directories(SYSTEM ${mtca4u-deviceaccess_INCLUDE_DIRS})
 
-FIND_PACKAGE(mtca4uVirtualLab 00.01 REQUIRED)
+FIND_PACKAGE(mtca4uVirtualLab 00.02 REQUIRED)
 include_directories(SYSTEM ${mtca4uVirtualLab_INCLUDE_DIRS})
 
 FIND_PACKAGE(Boost COMPONENTS thread REQUIRED)
@@ -38,17 +37,16 @@ ELSE(Boost_UNIT_TEST_FRAMEWORK_FOUND)
 ENDIF(Boost_UNIT_TEST_FRAMEWORK_FOUND)
 
 
-FIND_PACKAGE(mtca4uPy 00.01)
-include_directories(SYSTEM ${mtca4uPy_INCLUDE_DIRS})
-IF(mtca4uPy_FOUND)
+FIND_PACKAGE(mtca4uPy 00.07)
+IF(MTCA4UPY_FOUND)
   set(PYTHON_IS_ENABLED "true")
   FIND_PACKAGE(PythonLibs REQUIRED)
   FIND_PACKAGE(Boost COMPONENTS python REQUIRED)
-  include_directories( ${PYTHON_INCLUDE_DIRS} )
+  include_directories(SYSTEM ${mtca4uPy_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DENABLE_PYTHON_BINDINGS")
-ELSE(mtca4uPy_FOUND)
+ELSE(MTCA4UPY_FOUND)
   message("Python libraries not found, disabling Python bindings")
-ENDIF(mtca4uPy_FOUND)
+ENDIF(MTCA4UPY_FOUND)
 
 
 include_directories(${CMAKE_SOURCE_DIR}/include)

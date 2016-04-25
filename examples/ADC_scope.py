@@ -23,6 +23,7 @@ from pyqtgraph.Qt import QtCore, QtGui
 import pyqtgraph as pg
 
 # ad16 library
+import mtca4u
 import libad16
 from numpy import NaN, mean
 
@@ -288,13 +289,15 @@ class MainWindow(QtGui.QMainWindow):
             # open AD16 device
             if(devName[1]) :
                 myad16 = libad16.ad16()
+                mtca4u.set_dmap_location(name)
+                print 'DMAP file location is set to: '+mtca4u.get_dmap_location()
                 try:
-                    myad16.openDmap(name,str(devName[0]))
-                except libad16.ad16Exception, e:
+                    myad16.open(str(devName[0]))
+                except libad16.ad16Exception as e:
                     QtGui.QMessageBox.information(self, 'Error', e.what)
                     return
-                except:
-                    QtGui.QMessageBox.information(self, 'Error', 'Device cannot be opened.')
+                except Exception as e:
+                    QtGui.QMessageBox.information(self, 'Error', 'Device cannot be opened: '+str(e))
                     return
                 myad16.setTriggerMode(libad16.trigger.PERIODIC,1)
                 self.ad16 = myad16
