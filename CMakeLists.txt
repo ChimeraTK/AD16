@@ -18,7 +18,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0 --coverage")
 # linker flags
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--export-dynamic")
 
-FIND_PACKAGE(mtca4u-deviceaccess 00.11 REQUIRED)
+FIND_PACKAGE(mtca4u-deviceaccess 00.12 REQUIRED)
 include_directories(SYSTEM ${mtca4u-deviceaccess_INCLUDE_DIRS})
 
 FIND_PACKAGE(mtca4uVirtualLab 00.02 REQUIRED)

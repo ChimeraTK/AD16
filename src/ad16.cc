@@ -34,8 +34,8 @@ namespace mtca4u {
     // open register accessors
     regReset = _device->getRegisterAccessor("WORD_RESET_N","BOARD0");
     regAd16Enable = _device->getRegisterAccessor("WORD_AD16_ENA","AD160");
-    regClockFrequency = _device->getBufferingRegisterAccessor<int>("AD160","WORD_CLK_FREQ");
-    regTimingFrequency = _device->getBufferingRegisterAccessor<int>("APP0","WORD_TIMING_FREQ");
+    regClockFrequency.replace(_device->getBufferingRegisterAccessor<int>("AD160","WORD_CLK_FREQ"));
+    regTimingFrequency.replace(_device->getBufferingRegisterAccessor<int>("APP0","WORD_TIMING_FREQ"));
     regTimingInternalEnable = _device->getRegisterAccessor("WORD_TIMING_INT_ENA","APP0");
     regTimingTriggerSelect = _device->getRegisterAccessor("WORD_TIMING_TRG_SEL","APP0");
     regDaqEnable = _device->getRegisterAccessor("WORD_DAQ_ENABLE","APP0");
