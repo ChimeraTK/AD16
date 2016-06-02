@@ -20,11 +20,14 @@ set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--export-dynamic
 
 FIND_PACKAGE(mtca4u-deviceaccess 00.12 REQUIRED)
 include_directories(SYSTEM ${mtca4u-deviceaccess_INCLUDE_DIRS})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${mtca4u-deviceaccess_CXX_FLAGS}")
 
 FIND_PACKAGE(mtca4uVirtualLab 00.02 REQUIRED)
 include_directories(SYSTEM ${mtca4uVirtualLab_INCLUDE_DIRS})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${mtca4uVirtualLab_CXX_FLAGS}")
 
 FIND_PACKAGE(Boost COMPONENTS thread REQUIRED)
+include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 
 #For some reason the system library has to be mentioned explicitly to the linker.
 #This is strange because the thead library has it as a dependency.
@@ -56,11 +59,11 @@ aux_source_directory(${CMAKE_SOURCE_DIR}/src library_sources)
 
 MACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
   foreach( FILE_TO_COPY dummies.dmap ad16_scope_fmc25_r1224.mapp )
-    configure_file( tests/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
+    FILE (COPY tests/${FILE_TO_COPY} DESTINATION ${PROJECT_BINARY_DIR})
   endforeach( FILE_TO_COPY )
   if(PYTHON_IS_ENABLED)
     foreach( FILE_TO_COPY ADC_scope.py )
-      configure_file( examples/${FILE_TO_COPY} ${PROJECT_BINARY_DIR}/${FILE_TO_COPY} copyonly)
+      FILE (COPY examples/${FILE_TO_COPY} DESTINATION ${PROJECT_BINARY_DIR})
     endforeach( FILE_TO_COPY )
   endif(PYTHON_IS_ENABLED)
 ENDMACRO( COPY_MAPPING_FILES_AND_EXAMPLES )
@@ -131,6 +134,19 @@ install(DIRECTORY ${${PROJECT_NAME}_INCLUDE_DIRS} DESTINATION include/${PROJECT_
 	  PATTERN ".svn" EXCLUDE
 	  PATTERN "${PROJECT_NAME}" EXCLUDE
 	  )
+
+
+#Create the config files by filling the correct variables into the template (*.cmake.in).
+#All variables @VARIABLE@ are replaced with the current values, but they have to be set first....
+#Only the reference header is needed. The other variables are for dependencies of this library,
+#but there are none.
+set(${PROJECT_NAME}_INCLUDE_DIRS "${CMAKE_INSTALL_PREFIX}/include ${mtca4u-deviceaccess_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS}")
+set(${PROJECT_NAME}_LIBRARIES "${mtca4u-deviceaccess_LIBRARIES} ${Boost_LIBRARIES}")
+set(${PROJECT_NAME}_LIBRARY_DIRS "${CMAKE_INSTALL_PREFIX}/lib ${mtca4u-deviceaccess_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS}")
+set(${PROJECT_NAME}_CXX_FLAGS "${mtca4u-deviceaccess_CXX_FLAGS}")
+set(${PROJECT_NAME}_LINKER_FLAGS "-Wl,-rpath=${CMAKE_INSTALL_PREFIX}/lib,--enable-new-dtags")
+include(${CMAKE_SOURCE_DIR}/cmake/create_cmake_config_files.cmake)
+
 
 # The instructions to create a debian package are loaded from a separate file
 #include(${CMAKE_SOURCE_DIR}/cmake/prepare_debian_package.cmake)
